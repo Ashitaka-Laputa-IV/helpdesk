@@ -2,9 +2,10 @@
 
 图结构：START -> chatbot -> (tools -> chatbot)* -> END
 chatbot 节点调用模型；当模型请求调用工具时，先由 tools 节点执行，再回到 chatbot。
-对话历史通过 SqliteSaver checkpointer 持久化到 .chat.db，重启后可继续。
+对话历史通过 SqliteSaver checkpointer 持久化到 .chat.db，并按 (user_id, thread_id) 隔离。
 """
 
+import argparse
 import os
 import warnings
 from datetime import datetime
@@ -21,7 +22,23 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
 DB_PATH = Path(__file__).resolve().parents[2] / ".chat.db"
-THREAD_ID = "test"
+DEFAULT_USER = "default"
+DEFAULT_THREAD = "default"
+
+
+def thread_key(user_id: str, thread_id: str) -> str:
+    """拼出 checkpointer 的 thread_id，保证不同用户/会话互不串线。"""
+    return f"{user_id}:{thread_id}"
+
+
+def thread_config(user_id: str, thread_id: str) -> dict:
+    """构造传给图的 config。"""
+    return {"configurable": {"thread_id": thread_key(user_id, thread_id)}}
+
+
+def silence_beta_warning() -> None:
+    """v3 流式协议目前是实验性的，屏蔽其 beta 警告避免污染输出。"""
+    warnings.filterwarnings("ignore", category=LangChainBetaWarning)
 
 
 @tool
@@ -31,6 +48,12 @@ def get_current_time() -> str:
 
 
 TOOLS = [get_current_time]
+
+
+def load_model():
+    """从环境变量初始化对话模型。"""
+    load_dotenv()
+    return init_chat_model(os.environ["MODEL"])
 
 
 def build_graph(model, checkpointer=None):
@@ -55,18 +78,19 @@ def build_graph(model, checkpointer=None):
 
 
 def main() -> None:
-    # v3 流式协议目前是实验性的，屏蔽其 beta 警告避免污染 CLI 输出
-    warnings.filterwarnings("ignore", category=LangChainBetaWarning)
+    parser = argparse.ArgumentParser(description="命令行 chat")
+    parser.add_argument("--user", default=DEFAULT_USER, help="用户标识")
+    parser.add_argument("--thread", default=DEFAULT_THREAD, help="会话标识")
+    args = parser.parse_args()
 
-    load_dotenv()
-    model = init_chat_model(os.environ["MODEL"])
+    silence_beta_warning()
+    model = load_model()
+    config = thread_config(args.user, args.thread)
 
-    # 历史存 .chat.db，按 thread_id 隔离；只传新消息，LangGraph 自动接上历史
+    # 历史存 .chat.db，按 (user, thread) 隔离；只传新消息，LangGraph 自动接上历史
     with SqliteSaver.from_conn_string(str(DB_PATH)) as checkpointer:
         graph = build_graph(model, checkpointer)
-        config = {"configurable": {"thread_id": THREAD_ID}}
-
-        print("输入内容开始对话，输入 exit / quit 结束。")
+        print(f"[{args.user}/{args.thread}] 输入内容开始对话，输入 exit / quit 结束。")
         while True:
             try:
                 user_input = input("You: ")
