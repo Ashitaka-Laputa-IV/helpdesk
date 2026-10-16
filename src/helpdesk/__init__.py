@@ -71,18 +71,16 @@ def main() -> None:
                 break
 
             print("AI: ", end="", flush=True)
-            for chunk in graph.stream(
+            stream = graph.stream_events(
                 {"messages": [HumanMessage(content=user_input)]},
                 config,
-                stream_mode="messages",
-                version="v2",
-            ):
-                if chunk["type"] != "messages":
-                    continue
-                token, metadata = chunk["data"]
-                # 只打印 chatbot 节点产生的文本，跳过工具调用/工具结果
-                if metadata.get("langgraph_node") == "chatbot" and token.text:
-                    print(token.text, end="", flush=True)
+                version="v3",
+            )
+            # 投影消费：messages 投影按节点给出逐 token 文本
+            for _, item in stream.interleave("messages"):
+                if item.node == "chatbot":
+                    for token in item.text:
+                        print(token, end="", flush=True)
             print()
 
 
