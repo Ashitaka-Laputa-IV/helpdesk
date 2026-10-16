@@ -6,6 +6,7 @@ chatbot 节点调用模型；当模型请求调用工具时，先由 tools 节�
 """
 
 import os
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
@@ -14,6 +15,7 @@ from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage
 from langchain.tools import tool
+from langchain_core._api import LangChainBetaWarning
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
@@ -53,6 +55,9 @@ def build_graph(model, checkpointer=None):
 
 
 def main() -> None:
+    # v3 流式协议目前是实验性的，屏蔽其 beta 警告避免污染 CLI 输出
+    warnings.filterwarnings("ignore", category=LangChainBetaWarning)
+
     load_dotenv()
     model = init_chat_model(os.environ["MODEL"])
 
