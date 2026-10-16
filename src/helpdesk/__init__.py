@@ -19,7 +19,7 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
 DB_PATH = Path(__file__).resolve().parents[2] / ".chat.db"
-THREAD_ID = "default"
+THREAD_ID = "test"
 
 
 @tool
@@ -70,10 +70,20 @@ def main() -> None:
             if user_input.strip().lower() in {"exit", "quit"}:
                 break
 
-            result = graph.invoke(
-                {"messages": [HumanMessage(content=user_input)]}, config
-            )
-            print(f"AI: {result['messages'][-1].text}")
+            print("AI: ", end="", flush=True)
+            for chunk in graph.stream(
+                {"messages": [HumanMessage(content=user_input)]},
+                config,
+                stream_mode="messages",
+                version="v2",
+            ):
+                if chunk["type"] != "messages":
+                    continue
+                token, metadata = chunk["data"]
+                # 只打印 chatbot 节点产生的文本，跳过工具调用/工具结果
+                if metadata.get("langgraph_node") == "chatbot" and token.text:
+                    print(token.text, end="", flush=True)
+            print()
 
 
 if __name__ == '__main__':
