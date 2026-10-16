@@ -1,6 +1,7 @@
-"""最小 2-step RAG：加载 -> 切分 -> 嵌入 -> 检索 -> 重排 -> 生成。"""
+"""最小 2-step RAG：加载 -> 切分 -> 嵌入 -> 检索 -> 重排 -> 流式生成。"""
 
 import os
+from collections.abc import Iterator
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -16,6 +17,8 @@ DOCS_DIR = Path(__file__).resolve().parents[2] / "data" / "langchain-docs"
 INDEX_DIR = Path(__file__).resolve().parents[2] / ".chroma"
 COLLECTION = "helpdesk"
 BATCH_SIZE = 1000
+RECALL_K = 10  # 向量召回条数（重排前先放宽）
+TOP_K = 5  # 重排后进入上下文的条数
 SYSTEM_PROMPT = "你是客服助手，只依据给定资料回答问题；资料中没有的信息，直接说明不知道。"
 
 
@@ -37,7 +40,7 @@ def build_rag(
     data_dir: Path = DOCS_DIR,
     index_dir: Path = INDEX_DIR,
 ):
-    """构建 RAG 问答函数：检索 top-k，重排后取前 3 段作为上下文。
+    """构建 RAG 问答函数：向量召回 RECALL_K 条，重排后取前 TOP_K 段，流式生成。
 
     索引持久化在 index_dir（Chroma）。首次运行会切分并写入，之后直接复用，不再重复嵌入。
     """
@@ -55,11 +58,12 @@ def build_rag(
             store.add_documents(splits[start : start + BATCH_SIZE])
         print(f"已索引 {len(splits)} 个分块到 {index_dir}")
 
-    retriever = store.as_retriever(search_kwargs={"k": 20})
+    retriever = store.as_retriever(search_kwargs={"k": RECALL_K})
 
-    def answer(question: str) -> str:
+    def answer(question: str) -> Iterator[str]:
+        """检索 + 重排后，逐 token 产出回答。"""
         candidates = retriever.invoke(question)
-        top = reranker.compress_documents(candidates, query=question)[:5]
+        top = reranker.compress_documents(candidates, query=question)[:TOP_K]
         context = "\n\n".join(
             f"[{doc.metadata['source']}] {doc.page_content}" for doc in top
         )
@@ -67,7 +71,9 @@ def build_rag(
             SystemMessage(content=SYSTEM_PROMPT),
             HumanMessage(content=f"资料：\n{context}\n\n问题：{question}"),
         ]
-        return model.invoke(messages).text
+        for chunk in model.stream(messages):
+            if chunk.text:
+                yield chunk.text
 
     return answer
 
@@ -94,7 +100,11 @@ def main() -> None:
             break
         if question.strip().lower() in {"exit", "quit"}:
             break
-        print(f"A: {answer(question)}")
+
+        print("A: ", end="", flush=True)
+        for token in answer(question):
+            print(token, end="", flush=True)
+        print()
 
 
 if __name__ == "__main__":
