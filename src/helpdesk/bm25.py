@@ -53,7 +53,7 @@ def search(retriever, chunks, query: str, k: int = TOP_K):
 def show(retriever, chunks, query: str, k: int = TOP_K) -> None:
     print(f"\n查询: {query}")
     for rank, (score, source, text) in enumerate(search(retriever, chunks, query, k), 1):
-        preview = " ".join(text.split())[:90]
+        preview = " ".join(text.split())
         print(f"  {rank}. {score:6.3f}  {source}")
         print(f"     {preview}...")
 

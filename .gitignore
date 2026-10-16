@@ -5,3 +5,4 @@ __pycache__/
 .chroma/
 data/langchain-docs/
 .chat.db*
+.bm25_chat.db*
