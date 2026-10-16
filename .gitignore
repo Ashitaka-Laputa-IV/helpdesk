@@ -4,3 +4,4 @@ __pycache__/
 *.py[cod]
 .chroma/
 data/langchain-docs/
+.chat.db*

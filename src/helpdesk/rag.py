@@ -55,11 +55,11 @@ def build_rag(
             store.add_documents(splits[start : start + BATCH_SIZE])
         print(f"已索引 {len(splits)} 个分块到 {index_dir}")
 
-    retriever = store.as_retriever(search_kwargs={"k": 10})
+    retriever = store.as_retriever(search_kwargs={"k": 20})
 
     def answer(question: str) -> str:
         candidates = retriever.invoke(question)
-        top = reranker.compress_documents(candidates, query=question)[:3]
+        top = reranker.compress_documents(candidates, query=question)[:5]
         context = "\n\n".join(
             f"[{doc.metadata['source']}] {doc.page_content}" for doc in top
         )

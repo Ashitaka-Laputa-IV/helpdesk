@@ -2,18 +2,24 @@
 
 图结构：START -> chatbot -> (tools -> chatbot)* -> END
 chatbot 节点调用模型；当模型请求调用工具时，先由 tools 节点执行，再回到 chatbot。
+对话历史通过 SqliteSaver checkpointer 持久化到 .chat.db，重启后可继续。
 """
 
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Literal
 
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage
 from langchain.tools import tool
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
+
+DB_PATH = Path(__file__).resolve().parents[2] / ".chat.db"
+THREAD_ID = "default"
 
 
 @tool
@@ -25,7 +31,7 @@ def get_current_time() -> str:
 TOOLS = [get_current_time]
 
 
-def build_graph(model):
+def build_graph(model, checkpointer=None):
     """构建并编译 chat 图。"""
     model_with_tools = model.bind_tools(TOOLS)
 
@@ -43,27 +49,31 @@ def build_graph(model):
     builder.add_edge(START, "chatbot")
     builder.add_conditional_edges("chatbot", should_continue, ["tools", END])
     builder.add_edge("tools", "chatbot")
-    return builder.compile()
+    return builder.compile(checkpointer=checkpointer)
 
 
 def main() -> None:
     load_dotenv()
     model = init_chat_model(os.environ["MODEL"])
-    graph = build_graph(model)
 
-    messages = []
-    print("输入内容开始对话，输入 exit / quit 结束。")
-    while True:
-        try:
-            user_input = input("You: ")
-        except (EOFError, KeyboardInterrupt):
-            break
-        if user_input.strip().lower() in {"exit", "quit"}:
-            break
+    # 历史存 .chat.db，按 thread_id 隔离；只传新消息，LangGraph 自动接上历史
+    with SqliteSaver.from_conn_string(str(DB_PATH)) as checkpointer:
+        graph = build_graph(model, checkpointer)
+        config = {"configurable": {"thread_id": THREAD_ID}}
 
-        messages.append(HumanMessage(content=user_input))
-        messages = graph.invoke({"messages": messages})["messages"]
-        print(f"AI: {messages[-1].text}")
+        print("输入内容开始对话，输入 exit / quit 结束。")
+        while True:
+            try:
+                user_input = input("You: ")
+            except (EOFError, KeyboardInterrupt):
+                break
+            if user_input.strip().lower() in {"exit", "quit"}:
+                break
+
+            result = graph.invoke(
+                {"messages": [HumanMessage(content=user_input)]}, config
+            )
+            print(f"AI: {result['messages'][-1].text}")
 
 
 if __name__ == '__main__':
