@@ -12,13 +12,13 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+DOCS_DIR = Path(__file__).resolve().parents[2] / "data" / "langchain-docs"
 INDEX_DIR = Path(__file__).resolve().parents[2] / ".chroma"
 COLLECTION = "helpdesk"
 SYSTEM_PROMPT = "你是客服助手，只依据给定资料回答问题；资料中没有的信息，直接说明不知道。"
 
 
-def load_documents(data_dir: Path = DATA_DIR) -> list[Document]:
+def load_documents(data_dir: Path = DOCS_DIR) -> list[Document]:
     """把 data_dir 下的 markdown 读成 Document。"""
     return [
         Document(
@@ -33,7 +33,7 @@ def build_rag(
     model,
     embeddings,
     reranker,
-    data_dir: Path = DATA_DIR,
+    data_dir: Path = DOCS_DIR,
     index_dir: Path = INDEX_DIR,
 ):
     """构建 RAG 问答函数：检索 top-k，重排后取前 3 段作为上下文。
