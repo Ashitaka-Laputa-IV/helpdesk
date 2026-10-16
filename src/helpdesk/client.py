@@ -28,8 +28,8 @@ def ask(client: httpx.Client, base_url: str, user_id: str, thread_id: str, messa
                     print(event["text"], end="", flush=True)
     except httpx.HTTPError as exc:
         print(f"\n请求失败: {exc}")
-        return
-    print()
+    else:
+        print()
 
 
 def main() -> None:
