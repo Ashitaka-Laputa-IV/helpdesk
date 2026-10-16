@@ -18,7 +18,7 @@ from langgraph.prebuilt import ToolNode
 
 @tool
 def get_current_time() -> str:
-    """获取本机当前的日期与时间。"""
+    """获取当前的日期与时间。"""
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
