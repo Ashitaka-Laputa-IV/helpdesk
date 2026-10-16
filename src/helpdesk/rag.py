@@ -15,6 +15,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 DOCS_DIR = Path(__file__).resolve().parents[2] / "data" / "langchain-docs"
 INDEX_DIR = Path(__file__).resolve().parents[2] / ".chroma"
 COLLECTION = "helpdesk"
+BATCH_SIZE = 1000
 SYSTEM_PROMPT = "你是客服助手，只依据给定资料回答问题；资料中没有的信息，直接说明不知道。"
 
 
@@ -49,7 +50,9 @@ def build_rag(
         splits = RecursiveCharacterTextSplitter(
             chunk_size=1000, chunk_overlap=200
         ).split_documents(load_documents(data_dir))
-        store.add_documents(splits)
+        # Chroma 单次写入有上限（约 5461 条），分批写入
+        for start in range(0, len(splits), BATCH_SIZE):
+            store.add_documents(splits[start : start + BATCH_SIZE])
         print(f"已索引 {len(splits)} 个分块到 {index_dir}")
 
     retriever = store.as_retriever(search_kwargs={"k": 10})
