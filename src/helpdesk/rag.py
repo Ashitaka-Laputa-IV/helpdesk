@@ -6,13 +6,15 @@ from pathlib import Path
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage, SystemMessage
+from langchain_chroma import Chroma
 from langchain_core.documents import Document
-from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+INDEX_DIR = Path(__file__).resolve().parents[2] / ".chroma"
+COLLECTION = "helpdesk"
 SYSTEM_PROMPT = "你是客服助手，只依据给定资料回答问题；资料中没有的信息，直接说明不知道。"
 
 
@@ -27,14 +29,30 @@ def load_documents(data_dir: Path = DATA_DIR) -> list[Document]:
     ]
 
 
-def build_rag(model, embeddings, reranker, data_dir: Path = DATA_DIR):
-    """构建 RAG 问答函数：检索 top-k，重排后取前 3 段作为上下文。"""
-    splits = RecursiveCharacterTextSplitter(
-        chunk_size=1000, chunk_overlap=200
-    ).split_documents(load_documents(data_dir))
-    retriever = InMemoryVectorStore.from_documents(
-        documents=splits, embedding=embeddings
-    ).as_retriever(search_kwargs={"k": 10})
+def build_rag(
+    model,
+    embeddings,
+    reranker,
+    data_dir: Path = DATA_DIR,
+    index_dir: Path = INDEX_DIR,
+):
+    """构建 RAG 问答函数：检索 top-k，重排后取前 3 段作为上下文。
+
+    索引持久化在 index_dir（Chroma）。首次运行会切分并写入，之后直接复用，不再重复嵌入。
+    """
+    store = Chroma(
+        collection_name=COLLECTION,
+        embedding_function=embeddings,
+        persist_directory=str(index_dir),
+    )
+    if not store.get(limit=1)["ids"]:
+        splits = RecursiveCharacterTextSplitter(
+            chunk_size=1000, chunk_overlap=200
+        ).split_documents(load_documents(data_dir))
+        store.add_documents(splits)
+        print(f"已索引 {len(splits)} 个分块到 {index_dir}")
+
+    retriever = store.as_retriever(search_kwargs={"k": 10})
 
     def answer(question: str) -> str:
         candidates = retriever.invoke(question)
