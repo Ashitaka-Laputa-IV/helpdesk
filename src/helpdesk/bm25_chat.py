@@ -18,7 +18,7 @@ from langchain_core._api import LangChainBetaWarning
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 
-from .bm25 import build_index, load_chunks, search
+from helpdesk.bm25 import build_index, load_chunks, search
 
 DB_PATH = Path(__file__).resolve().parents[2] / ".bm25_chat.db"
 THREAD_ID = "default"
