@@ -9,9 +9,9 @@
 Router 支持两种模式（ROUTER_MODE）：
   - rule（默认）：0ms 规则，寒暄/致谢判「不检索」，其余默认「检索」。
     实测当前 2.6B 模型关掉思考后无法做这个判断（一律答 n），开思考又要 1.5~3s，故默认走规则。
-  - llm：交给 LLM 做 A/B 分类（A=寒暄/常识，B=需查文档），temperature=0，
-    只喂当前问题、不带历史；异常或输出不可解析时保守地默认「检索」。
-    实测 Qwen3-4B-Instruct 约 40ms，配 ROUTER_MODEL / ROUTER_BASE_URL 指向该服务。
+  - llm：用 with_structured_output 让模型直接返回目标节点名（retrieve / chatbot），
+    省掉文本解析；temperature=0，只喂当前问题、不带历史；
+    异常时保守地默认「检索」。配 ROUTER_MODEL / ROUTER_BASE_URL 指向非思考小模型。
 
 用法:
     uv run python src/helpdesk/router_chat.py
@@ -22,6 +22,7 @@ import re
 import time
 import warnings
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
@@ -32,6 +33,7 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
+from pydantic import BaseModel, Field
 
 from helpdesk import DEFAULT_THREAD, DEFAULT_USER, silence_beta_warning, thread_config
 from helpdesk.bm25 import build_index, load_chunks, search
@@ -41,18 +43,17 @@ DB_PATH = Path(__file__).resolve().parents[2] / ".router_chat.db"
 BM25_K = 40
 SEMANTIC_K = 20
 TOP_K = 5
-ROUTER_MAX_TOKENS = 256  # 只防跑飞；当前模型思考要 100+ token，卡太小会得到空串
+ROUTER_MAX_TOKENS = 64  # 结构化输出只需几个 token，留点余量
 
-# Router：不带历史、只输出一个字母。
-# 实测（Qwen3-4B-Instruct，~40ms）：用 A/B 分类比 yes/no 判断准得多——
-# 问「是否需要检索外部资料」时，模型会因"这我懂"一律答 n。
+# Router：不带历史，由 schema 约束输出目标节点名，无需解析文本。
+# 注意别问「是否需要检索外部资料」——模型会因"这我懂"一律答否；
+# 问「属于哪一类」才准。
 ROUTER_PROMPT = (
-    "你在 LangChain/LangGraph 技术客服场景工作。判断问题类型，只输出一个字母。\n"
-    "A = 寒暄、闲聊、或通用常识（无需查技术文档）\n"
-    "B = 需要查阅 LangChain/LangGraph 技术文档才能准确回答\n"
-    "拿不准时输出 B。\n"
-    "问题：{question}\n"
-    "答案："
+    "你在 LangChain/LangGraph 技术客服场景工作。判断用户问题：\n"
+    "- 寒暄、闲聊、或通用常识，不需要查文档 -> chatbot\n"
+    "- 需要查阅 LangChain/LangGraph 技术文档才能准确回答 -> retrieve\n"
+    "拿不准选 retrieve。\n"
+    "问题：{question}"
 )
 
 # 0ms 快路径：纯寒暄/确认显然不需要查库，直接跳过 LLM 路由
@@ -64,6 +65,14 @@ SMALL_TALK = re.compile(
 
 SYSTEM_PROMPT = "你是客服助手，只依据给定资料回答问题；资料中没有的信息，直接说明不知道。"
 PLAIN_PROMPT = "你是客服助手，请直接、简洁地回答用户。"
+
+
+class RouteDecision(BaseModel):
+    """Router 的输出：直接给出目标节点名，省掉文本解析。"""
+
+    next: Literal["retrieve", "chatbot"] = Field(
+        description="retrieve=需要检索知识库；chatbot=直接回答"
+    )
 
 
 class ChatState(MessagesState):
@@ -81,17 +90,15 @@ def rule_needs_retrieval(question: str) -> bool:
     return not SMALL_TALK.match(question)
 
 
-def needs_retrieval(router_model, question: str) -> bool:
-    """LLM 判定是否需要检索；异常或输出不可解析时保守返回 True。"""
+def needs_retrieval(structured_router, question: str) -> bool:
+    """LLM 路由：schema 直接返回目标节点名；异常时保守返回 True（检索）。"""
     try:
-        raw = router_model.invoke(
+        route = structured_router.invoke(
             [HumanMessage(content=ROUTER_PROMPT.format(question=question))]
-        ).text
+        )
     except Exception:  # noqa: BLE001 - 路由失败不应阻塞对话
         return True
-    # 只认 A（不检索）；B 或任何无法解析的输出都按「检索」处理
-    letters = "".join(ch for ch in raw.upper() if ch.isalpha())
-    return not letters.startswith("A")
+    return route.next == "retrieve"
 
 
 def build_graph(
@@ -105,18 +112,14 @@ def build_graph(
     router_mode: str = "rule",
 ):
     """构建并编译 chat 图。"""
-    # 不采样；尽量抑制思考链
-    fast_router = router_model.bind(
-        temperature=0,
-        reasoning_effort="none",
-        max_tokens=ROUTER_MAX_TOKENS,
-    )
+    # 结构化输出：模型直接返回目标节点名
+    structured_router = router_model.with_structured_output(RouteDecision)
 
     def router(state: ChatState) -> dict:
         question = state["messages"][-1].text
         started = time.perf_counter()
         if router_mode == "llm":
-            search_needed = needs_retrieval(fast_router, question)
+            search_needed = needs_retrieval(structured_router, question)
         else:
             search_needed = rule_needs_retrieval(question)
         cost = time.perf_counter() - started
@@ -223,6 +226,8 @@ def main() -> None:
         os.environ.get("ROUTER_MODEL", os.environ["MODEL"]),
         base_url=os.environ.get("ROUTER_BASE_URL", os.environ["OPENAI_API_BASE"]),
         api_key=os.environ["OPENAI_API_KEY"],
+        temperature=0,
+        max_tokens=ROUTER_MAX_TOKENS,
     )
     router_mode = os.environ.get("ROUTER_MODE", "rule")
     config = thread_config(DEFAULT_USER, DEFAULT_THREAD)
