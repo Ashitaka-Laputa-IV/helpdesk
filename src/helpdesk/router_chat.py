@@ -9,9 +9,9 @@
 Router 支持两种模式（ROUTER_MODE）：
   - rule（默认）：0ms 规则，寒暄/致谢判「不检索」，其余默认「检索」。
     实测当前 2.6B 模型关掉思考后无法做这个判断（一律答 n），开思考又要 1.5~3s，故默认走规则。
-  - llm：交给 LLM，最短提示（只答 y/n）+ temperature=0 + reasoning_effort=none，
+  - llm：交给 LLM 做 A/B 分类（A=寒暄/常识，B=需查文档），temperature=0，
     只喂当前问题、不带历史；异常或输出不可解析时保守地默认「检索」。
-    需要配一个非思考的小模型（ROUTER_MODEL）才既快又准。
+    实测 Qwen3-4B-Instruct 约 40ms，配 ROUTER_MODEL / ROUTER_BASE_URL 指向该服务。
 
 用法:
     uv run python src/helpdesk/router_chat.py
@@ -43,9 +43,17 @@ SEMANTIC_K = 20
 TOP_K = 5
 ROUTER_MAX_TOKENS = 256  # 只防跑飞；当前模型思考要 100+ token，卡太小会得到空串
 
-# Router：不带历史、不解释、只答一个字母。
-# 实测（LFM2.5-2.6B）：y/n 版比 yes/no 版快一倍；再配 reasoning_effort="none" 可由 ~3.5s 降到 ~1.4s。
-ROUTER_PROMPT = "只输出 y 或 n。是否需要检索外部资料来回答「{question}」？"
+# Router：不带历史、只输出一个字母。
+# 实测（Qwen3-4B-Instruct，~40ms）：用 A/B 分类比 yes/no 判断准得多——
+# 问「是否需要检索外部资料」时，模型会因"这我懂"一律答 n。
+ROUTER_PROMPT = (
+    "你在 LangChain/LangGraph 技术客服场景工作。判断问题类型，只输出一个字母。\n"
+    "A = 寒暄、闲聊、或通用常识（无需查技术文档）\n"
+    "B = 需要查阅 LangChain/LangGraph 技术文档才能准确回答\n"
+    "拿不准时输出 B。\n"
+    "问题：{question}\n"
+    "答案："
+)
 
 # 0ms 快路径：纯寒暄/确认显然不需要查库，直接跳过 LLM 路由
 SMALL_TALK = re.compile(
@@ -81,8 +89,9 @@ def needs_retrieval(router_model, question: str) -> bool:
         ).text
     except Exception:  # noqa: BLE001 - 路由失败不应阻塞对话
         return True
-    letters = "".join(ch for ch in raw.lower() if ch.isalpha())
-    return not letters.startswith("n")
+    # 只认 A（不检索）；B 或任何无法解析的输出都按「检索」处理
+    letters = "".join(ch for ch in raw.upper() if ch.isalpha())
+    return not letters.startswith("A")
 
 
 def build_graph(
@@ -209,7 +218,12 @@ def main() -> None:
     print(f"已索引 {len(chunks)} 个分块")
 
     model = init_chat_model(os.environ["MODEL"])
-    router_model = init_chat_model(os.environ.get("ROUTER_MODEL", os.environ["MODEL"]))
+    # Router 可以指向另一个服务（例如非思考的小模型），默认复用对话模型
+    router_model = init_chat_model(
+        os.environ.get("ROUTER_MODEL", os.environ["MODEL"]),
+        base_url=os.environ.get("ROUTER_BASE_URL", os.environ["OPENAI_API_BASE"]),
+        api_key=os.environ["OPENAI_API_KEY"],
+    )
     router_mode = os.environ.get("ROUTER_MODE", "rule")
     config = thread_config(DEFAULT_USER, DEFAULT_THREAD)
 
