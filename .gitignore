@@ -6,3 +6,4 @@ __pycache__/
 data/langchain-docs/
 .chat.db*
 .bm25_chat.db*
+.router_chat.db*
