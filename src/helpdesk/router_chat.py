@@ -6,10 +6,12 @@
          router --不检索--------------------> chatbot
          chatbot -> END
 
-Router 分两级降低时延：
-  1) 0ms 规则快路径：纯寒暄/确认直接判为「不检索」，不进模型；
-  2) 其余交给 LLM：最短提示（只答 y/n）+ temperature=0 + reasoning_effort=none，
-     只喂当前问题、不带历史；异常或输出不可解析时保守地默认「检索」。
+Router 支持两种模式（ROUTER_MODE）：
+  - rule（默认）：0ms 规则，寒暄/致谢判「不检索」，其余默认「检索」。
+    实测当前 2.6B 模型关掉思考后无法做这个判断（一律答 n），开思考又要 1.5~3s，故默认走规则。
+  - llm：交给 LLM，最短提示（只答 y/n）+ temperature=0 + reasoning_effort=none，
+    只喂当前问题、不带历史；异常或输出不可解析时保守地默认「检索」。
+    需要配一个非思考的小模型（ROUTER_MODEL）才既快又准。
 
 用法:
     uv run python src/helpdesk/router_chat.py
@@ -66,10 +68,13 @@ class ChatState(MessagesState):
     context: str
 
 
+def rule_needs_retrieval(question: str) -> bool:
+    """0ms 规则判定：寒暄/致谢不需要查库，其余默认检索（宁可多查）。"""
+    return not SMALL_TALK.match(question)
+
+
 def needs_retrieval(router_model, question: str) -> bool:
-    """判断是否需要检索：先走 0ms 规则，再问 LLM；异常或不可解析时保守返回 True。"""
-    if SMALL_TALK.match(question):
-        return False
+    """LLM 判定是否需要检索；异常或输出不可解析时保守返回 True。"""
     try:
         raw = router_model.invoke(
             [HumanMessage(content=ROUTER_PROMPT.format(question=question))]
@@ -80,9 +85,18 @@ def needs_retrieval(router_model, question: str) -> bool:
     return not letters.startswith("n")
 
 
-def build_graph(model, router_model, bm25, chunks, retriever, reranker, checkpointer=None):
+def build_graph(
+    model,
+    router_model,
+    bm25,
+    chunks,
+    retriever,
+    reranker,
+    checkpointer=None,
+    router_mode: str = "rule",
+):
     """构建并编译 chat 图。"""
-    # 不采样；尽量抑制思考链（实测可把路由耗时压掉一半以上）
+    # 不采样；尽量抑制思考链
     fast_router = router_model.bind(
         temperature=0,
         reasoning_effort="none",
@@ -92,9 +106,15 @@ def build_graph(model, router_model, bm25, chunks, retriever, reranker, checkpoi
     def router(state: ChatState) -> dict:
         question = state["messages"][-1].text
         started = time.perf_counter()
-        search_needed = needs_retrieval(fast_router, question)
+        if router_mode == "llm":
+            search_needed = needs_retrieval(fast_router, question)
+        else:
+            search_needed = rule_needs_retrieval(question)
         cost = time.perf_counter() - started
-        print(f"[router] {'检索' if search_needed else '不检索'}  {cost * 1000:.0f}ms")
+        print(
+            f"[router] {'检索' if search_needed else '不检索'}"
+            f"  {cost * 1000:.0f}ms  ({router_mode})"
+        )
         # 每轮先清空 context，避免上一轮的检索结果被沿用
         return {"search": search_needed, "context": ""}
 
@@ -190,10 +210,20 @@ def main() -> None:
 
     model = init_chat_model(os.environ["MODEL"])
     router_model = init_chat_model(os.environ.get("ROUTER_MODEL", os.environ["MODEL"]))
+    router_mode = os.environ.get("ROUTER_MODE", "rule")
     config = thread_config(DEFAULT_USER, DEFAULT_THREAD)
 
     with SqliteSaver.from_conn_string(str(DB_PATH)) as checkpointer:
-        graph = build_graph(model, router_model, bm25, chunks, retriever, reranker, checkpointer)
+        graph = build_graph(
+            model,
+            router_model,
+            bm25,
+            chunks,
+            retriever,
+            reranker,
+            checkpointer,
+            router_mode,
+        )
 
         print("输入问题开始问答，输入 exit / quit 结束。")
         while True:
