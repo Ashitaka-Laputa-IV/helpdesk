@@ -85,6 +85,16 @@ class ChatState(MessagesState):
     context: str
 
 
+def silence_serializer_warning() -> None:
+    """屏蔽结构化输出带来的噪声。
+
+    with_structured_output 把解析结果放进消息的 parsed 字段，LangGraph 在
+    checkpoint/事件序列化时会报 PydanticSerializationUnexpectedValue。
+    解析结果本身是正确的，只是序列化器不认识这个类型。
+    """
+    warnings.filterwarnings("ignore", message="Pydantic serializer warnings")
+
+
 def rule_needs_retrieval(question: str) -> bool:
     """0ms 规则判定：寒暄/致谢不需要查库，其余默认检索（宁可多查）。"""
     return not SMALL_TALK.match(question)
@@ -200,6 +210,7 @@ def build_graph(
 
 def main() -> None:
     silence_beta_warning()
+    silence_serializer_warning()
     load_dotenv()
 
     chunks = load_chunks()
