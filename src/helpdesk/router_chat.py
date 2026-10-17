@@ -28,7 +28,7 @@ from typing import Literal
 
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
-from langchain.messages import HumanMessage, RemoveMessage, SystemMessage
+from langchain.messages import HumanMessage, SystemMessage
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
@@ -40,7 +40,7 @@ from pydantic import BaseModel, Field
 from helpdesk import DEFAULT_THREAD, DEFAULT_USER, silence_beta_warning, thread_config
 from helpdesk.bm25 import build_index, load_chunks, search
 from helpdesk.rag import COLLECTION, INDEX_DIR
-from helpdesk.summarize import summarize_if_needed
+from helpdesk.summarize import compress_history
 
 DB_PATH = Path(__file__).resolve().parents[2] / ".router_chat.db"
 BM25_K = 40
@@ -57,9 +57,6 @@ ROUTER_PROMPT = (
     "- 历史完全没有相关信息，需要查阅 LangChain/LangGraph 技术文档 -> retrieve\n"
     "无法确定时选 retrieve。"
 )
-
-# 更早的对话已被压缩成摘要，接在规则后面一并交给 router
-ROUTER_SUMMARY_SUFFIX = "\n\n（更早对话的摘要）\n{summary}"
 
 # 0ms 快路径：纯寒暄/确认显然不需要查库，直接跳过 LLM 路由
 SMALL_TALK = re.compile(
@@ -81,9 +78,8 @@ class RouteDecision(BaseModel):
 
 
 class ChatState(MessagesState):
-    """messages 是对话；summary 是更早对话的摘要；search 是路由结果；其余是各阶段产物。"""
+    """messages 是对话（含更早对话的摘要）；search 是路由结果；其余是各阶段产物。"""
 
-    summary: str
     search: bool
     bm25_docs: list[dict]
     semantic_docs: list[dict]
@@ -106,16 +102,16 @@ def rule_needs_retrieval(question: str) -> bool:
     return not SMALL_TALK.match(question)
 
 
-def needs_retrieval(structured_router, messages, summary: str = "") -> bool:
-    """LLM 路由：直接把对话轮次作为输入，规则和早期摘要放在 system 里。
+def needs_retrieval(structured_router, messages) -> bool:
+    """LLM 路由：直接把对话轮次作为输入，规则放在 system 里。
 
+    更早的对话已由 sum 中间件压成一条 HumanMessage，随 messages 一起送进来。
     由 schema 返回目标节点名；异常时保守返回 True（检索）。
     """
-    prompt = ROUTER_PROMPT
-    if summary:
-        prompt += ROUTER_SUMMARY_SUFFIX.format(summary=summary)
     try:
-        route = structured_router.invoke([SystemMessage(content=prompt), *messages])
+        route = structured_router.invoke(
+            [SystemMessage(content=ROUTER_PROMPT), *messages]
+        )
     except Exception:  # noqa: BLE001 - 路由失败不应阻塞对话
         return True
     return route.next == "retrieve"
@@ -137,14 +133,8 @@ def build_graph(
 
     def summarize(state: ChatState) -> dict:
         """历史超预算时把较早的对话压成摘要，控制上下文长度。"""
-        previous = state.get("summary", "")
-        new_summary, removed = summarize_if_needed(model, previous, state["messages"])
-        updates: dict = {}
-        if new_summary != previous:
-            updates["summary"] = new_summary
-        if removed:
-            updates["messages"] = [RemoveMessage(id=message_id) for message_id in removed]
-        return updates
+        updates = compress_history(model, state["messages"])
+        return {"messages": updates} if updates else {}
 
     def router(state: ChatState) -> dict:
         messages = state["messages"]
@@ -152,9 +142,7 @@ def build_graph(
         started = time.perf_counter()
         # 寒暄/致谢走 0ms 快路径（两种模式都适用），其余才交给 LLM 判断
         if router_mode == "llm" and not SMALL_TALK.match(question):
-            search_needed = needs_retrieval(
-                structured_router, messages, state.get("summary", "")
-            )
+            search_needed = needs_retrieval(structured_router, messages)
         else:
             search_needed = rule_needs_retrieval(question)
         cost = time.perf_counter() - started
@@ -209,8 +197,6 @@ def build_graph(
             if state["context"]
             else PLAIN_PROMPT
         )
-        if state.get("summary"):
-            prompt = f"{prompt}\n\n（更早对话的摘要）\n{state['summary']}"
         reply = model.invoke([SystemMessage(content=prompt), *state["messages"]])
         return {"messages": [reply]}
 
