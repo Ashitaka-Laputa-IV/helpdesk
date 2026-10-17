@@ -10,8 +10,9 @@ Router 支持两种模式（ROUTER_MODE）：
   - rule（默认）：0ms 规则，寒暄/致谢判「不检索」，其余默认「检索」。
     实测当前 2.6B 模型关掉思考后无法做这个判断（一律答 n），开思考又要 1.5~3s，故默认走规则。
   - llm：用 with_structured_output 让模型直接返回目标节点名（retrieve / chatbot），
-    省掉文本解析；temperature=0，历史压平进提示词（当对话输入会让模型跑偏），
+    省掉文本解析；temperature=0，直接把 state["messages"] 当对话输入（模型能看到完整轮次），
     历史已能回答的问题不再检索；异常时保守地默认「检索」。
+    依赖 summarize 节点先把历史压缩——历史很长时对话形态会把模型带跑（顺着对话作答而不是分类）。
     配 ROUTER_MODEL / ROUTER_BASE_URL 指向非思考小模型。
 
 用法:
@@ -39,7 +40,7 @@ from pydantic import BaseModel, Field
 from helpdesk import DEFAULT_THREAD, DEFAULT_USER, silence_beta_warning, thread_config
 from helpdesk.bm25 import build_index, load_chunks, search
 from helpdesk.rag import COLLECTION, INDEX_DIR
-from helpdesk.summarize import format_history, summarize_if_needed
+from helpdesk.summarize import summarize_if_needed
 
 DB_PATH = Path(__file__).resolve().parents[2] / ".router_chat.db"
 BM25_K = 40
@@ -47,18 +48,18 @@ SEMANTIC_K = 20
 TOP_K = 5
 ROUTER_MAX_TOKENS = 128  # 留出余量：历史较长时模型偶尔会多写几个 token
 
-# Router 提示：历史压平成文本放进提示词，问题作为待分类对象。
-# 千万不要把整段对话当 chat 输入——模型会进入聊天模式，开始作答而不是分类（实测判错且跑飞）。
+# Router 提示：直接把 state["messages"] 当对话输入，规则放在 system 里。
+# 前提是 summarize 节点已把历史压短（默认保留最近 6 条）——历史一长，小模型会顺着对话作答而不是分类。
 # 也不要问「是否需要检索外部资料」，模型会因"这我懂"一律答否；问「属于哪一类」才准。
 ROUTER_PROMPT = (
-    "你是路由器，只做分类，不要回答问题。判断当前问题能否直接用对话历史回答：\n"
-    "- 历史里已给出过该问题的答案（含用户重复问同一句）-> chatbot\n"
-    "- 寒暄、闲聊、或通用常识 -> chatbot\n"
+    "你是路由器，只做分类，不要回答问题。判断最后一条用户消息属于哪种：\n"
+    "- 对话历史里已给出过该问题的答案（含用户重复问同一句），或它是寒暄、闲聊、通用常识 -> chatbot\n"
     "- 历史完全没有相关信息，需要查阅 LangChain/LangGraph 技术文档 -> retrieve\n"
-    "无法确定时选 retrieve。\n\n"
-    "[对话历史]\n{history}\n\n"
-    "[当前问题]\n{question}"
+    "无法确定时选 retrieve。"
 )
+
+# 更早的对话已被压缩成摘要，接在规则后面一并交给 router
+ROUTER_SUMMARY_SUFFIX = "\n\n（更早对话的摘要）\n{summary}"
 
 # 0ms 快路径：纯寒暄/确认显然不需要查库，直接跳过 LLM 路由
 SMALL_TALK = re.compile(
@@ -106,15 +107,15 @@ def rule_needs_retrieval(question: str) -> bool:
 
 
 def needs_retrieval(structured_router, messages, summary: str = "") -> bool:
-    """LLM 路由：历史（含早期摘要）压平进提示词，当前问题作为待分类对象。
+    """LLM 路由：直接把对话轮次作为输入，规则和早期摘要放在 system 里。
 
     由 schema 返回目标节点名；异常时保守返回 True（检索）。
     """
-    prompt = ROUTER_PROMPT.format(
-        history=format_history(messages, summary), question=messages[-1].text
-    )
+    prompt = ROUTER_PROMPT
+    if summary:
+        prompt += ROUTER_SUMMARY_SUFFIX.format(summary=summary)
     try:
-        route = structured_router.invoke([HumanMessage(content=prompt)])
+        route = structured_router.invoke([SystemMessage(content=prompt), *messages])
     except Exception:  # noqa: BLE001 - 路由失败不应阻塞对话
         return True
     return route.next == "retrieve"

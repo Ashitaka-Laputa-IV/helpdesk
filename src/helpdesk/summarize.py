@@ -46,24 +46,13 @@ def safe_cutoff(messages, keep: int) -> int:
 
 
 def format_dialogue(messages) -> str:
-    """把消息渲染成单行文本，给总结模型和 router 用。"""
+    """把消息渲染成单行文本，给总结模型用。"""
     lines = []
     for message in messages:
         text = getattr(message, "text", "") or ""
         if text:
             lines.append(f"{message.type}: {text}")
     return "\n".join(lines)
-
-
-def format_history(messages, summary: str = "") -> str:
-    """router 用的历史文本：早期摘要 + 最近若干条原文。"""
-    parts = []
-    if summary:
-        parts.append(f"（更早对话的摘要）\n{summary}")
-    recent = format_dialogue(messages[:-1]) if messages else ""
-    if recent:
-        parts.append(recent)
-    return "\n".join(parts) or "（无历史）"
 
 
 def summarize_if_needed(model, summary: str, messages) -> tuple[str, list[str]]:
