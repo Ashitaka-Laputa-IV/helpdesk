@@ -10,8 +10,9 @@ Router 支持两种模式（ROUTER_MODE）：
   - rule（默认）：0ms 规则，寒暄/致谢判「不检索」，其余默认「检索」。
     实测当前 2.6B 模型关掉思考后无法做这个判断（一律答 n），开思考又要 1.5~3s，故默认走规则。
   - llm：用 with_structured_output 让模型直接返回目标节点名（retrieve / chatbot），
-    省掉文本解析；temperature=0，只喂当前问题、不带历史；
-    异常时保守地默认「检索」。配 ROUTER_MODEL / ROUTER_BASE_URL 指向非思考小模型。
+    省掉文本解析；temperature=0，带上最近几轮历史（截断控制），
+    历史已能回答的问题不再检索；异常时保守地默认「检索」。
+    配 ROUTER_MODEL / ROUTER_BASE_URL 指向非思考小模型。
 
 用法:
     uv run python src/helpdesk/router_chat.py
@@ -44,16 +45,20 @@ BM25_K = 40
 SEMANTIC_K = 20
 TOP_K = 5
 ROUTER_MAX_TOKENS = 64  # 结构化输出只需几个 token，留点余量
+HISTORY_MESSAGES = 4  # 路由参考的历史条数（不含当前问题）
+HISTORY_CHARS = 200  # 每条历史最多保留的字符数，控制 prefill 成本
 
-# Router：不带历史，由 schema 约束输出目标节点名，无需解析文本。
-# 注意别问「是否需要检索外部资料」——模型会因"这我懂"一律答否；
-# 问「属于哪一类」才准。
+# Router：由 schema 约束输出目标节点名，无需解析文本。
+# 注意别问「是否需要检索外部资料」——模型会因"这我懂"一律答否；问「属于哪一类」才准。
+# 历史已能回答的问题（追问、指代）走 chatbot，避免多余检索。
 ROUTER_PROMPT = (
-    "你在 LangChain/LangGraph 技术客服场景工作。判断用户问题：\n"
+    "你在 LangChain/LangGraph 技术客服场景工作。结合对话历史判断当前问题：\n"
+    "- 历史里已有足够信息可以直接回答 -> chatbot\n"
     "- 寒暄、闲聊、或通用常识，不需要查文档 -> chatbot\n"
     "- 需要查阅 LangChain/LangGraph 技术文档才能准确回答 -> retrieve\n"
-    "拿不准选 retrieve。\n"
-    "问题：{question}"
+    "拿不准选 retrieve。\n\n"
+    "[对话历史]\n{history}\n\n"
+    "[当前问题]\n{question}"
 )
 
 # 0ms 快路径：纯寒暄/确认显然不需要查库，直接跳过 LLM 路由
@@ -100,11 +105,25 @@ def rule_needs_retrieval(question: str) -> bool:
     return not SMALL_TALK.match(question)
 
 
-def needs_retrieval(structured_router, question: str) -> bool:
-    """LLM 路由：schema 直接返回目标节点名；异常时保守返回 True（检索）。"""
+def format_history(messages, max_messages: int = HISTORY_MESSAGES) -> str:
+    """取最近若干条历史（不含当前问题），截断后拼成路由可读的文本。"""
+    lines = []
+    for message in messages[-(max_messages + 1) : -1]:
+        text = " ".join(str(message.text).split())[:HISTORY_CHARS]
+        if text:
+            lines.append(f"{message.type}: {text}")
+    return "\n".join(lines) or "（无历史）"
+
+
+def needs_retrieval(structured_router, question: str, history: str) -> bool:
+    """LLM 路由：结合历史判断，schema 直接返回目标节点名；异常时保守返回 True（检索）。"""
     try:
         route = structured_router.invoke(
-            [HumanMessage(content=ROUTER_PROMPT.format(question=question))]
+            [
+                HumanMessage(
+                    content=ROUTER_PROMPT.format(history=history, question=question)
+                )
+            ]
         )
     except Exception:  # noqa: BLE001 - 路由失败不应阻塞对话
         return True
@@ -126,10 +145,13 @@ def build_graph(
     structured_router = router_model.with_structured_output(RouteDecision)
 
     def router(state: ChatState) -> dict:
-        question = state["messages"][-1].text
+        messages = state["messages"]
+        question = messages[-1].text
         started = time.perf_counter()
         if router_mode == "llm":
-            search_needed = needs_retrieval(structured_router, question)
+            search_needed = needs_retrieval(
+                structured_router, question, format_history(messages)
+            )
         else:
             search_needed = rule_needs_retrieval(question)
         cost = time.perf_counter() - started
