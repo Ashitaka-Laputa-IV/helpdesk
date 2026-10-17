@@ -1,6 +1,6 @@
 """并行检索 + Router 决定是否检索的问答 chat。
 
-图结构：START -> router
+图结构：START -> summarize -> router
          router --检索--> bm25(40) ─┐
          router --检索--> semantic(20) ─> combine(去重) -> rerank(5) -> chatbot
          router --不检索--------------------> chatbot
@@ -27,7 +27,7 @@ from typing import Literal
 
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
-from langchain.messages import HumanMessage, SystemMessage
+from langchain.messages import HumanMessage, RemoveMessage, SystemMessage
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
@@ -39,6 +39,7 @@ from pydantic import BaseModel, Field
 from helpdesk import DEFAULT_THREAD, DEFAULT_USER, silence_beta_warning, thread_config
 from helpdesk.bm25 import build_index, load_chunks, search
 from helpdesk.rag import COLLECTION, INDEX_DIR
+from helpdesk.summarize import format_history, summarize_if_needed
 
 DB_PATH = Path(__file__).resolve().parents[2] / ".router_chat.db"
 BM25_K = 40
@@ -79,8 +80,9 @@ class RouteDecision(BaseModel):
 
 
 class ChatState(MessagesState):
-    """messages 是对话；search 是路由结果；其余是各阶段产物。"""
+    """messages 是对话；summary 是更早对话的摘要；search 是路由结果；其余是各阶段产物。"""
 
+    summary: str
     search: bool
     bm25_docs: list[dict]
     semantic_docs: list[dict]
@@ -103,13 +105,14 @@ def rule_needs_retrieval(question: str) -> bool:
     return not SMALL_TALK.match(question)
 
 
-def needs_retrieval(structured_router, messages) -> bool:
-    """LLM 路由：历史压平进提示词，当前问题作为待分类对象。
+def needs_retrieval(structured_router, messages, summary: str = "") -> bool:
+    """LLM 路由：历史（含早期摘要）压平进提示词，当前问题作为待分类对象。
 
     由 schema 返回目标节点名；异常时保守返回 True（检索）。
     """
-    history = "\n".join(f"{m.type}: {m.text}" for m in messages[:-1]) or "（无历史）"
-    prompt = ROUTER_PROMPT.format(history=history, question=messages[-1].text)
+    prompt = ROUTER_PROMPT.format(
+        history=format_history(messages, summary), question=messages[-1].text
+    )
     try:
         route = structured_router.invoke([HumanMessage(content=prompt)])
     except Exception:  # noqa: BLE001 - 路由失败不应阻塞对话
@@ -131,13 +134,26 @@ def build_graph(
     # 结构化输出：模型直接返回目标节点名
     structured_router = router_model.with_structured_output(RouteDecision)
 
+    def summarize(state: ChatState) -> dict:
+        """历史超预算时把较早的对话压成摘要，控制上下文长度。"""
+        previous = state.get("summary", "")
+        new_summary, removed = summarize_if_needed(model, previous, state["messages"])
+        updates: dict = {}
+        if new_summary != previous:
+            updates["summary"] = new_summary
+        if removed:
+            updates["messages"] = [RemoveMessage(id=message_id) for message_id in removed]
+        return updates
+
     def router(state: ChatState) -> dict:
         messages = state["messages"]
         question = messages[-1].text
         started = time.perf_counter()
         # 寒暄/致谢走 0ms 快路径（两种模式都适用），其余才交给 LLM 判断
         if router_mode == "llm" and not SMALL_TALK.match(question):
-            search_needed = needs_retrieval(structured_router, messages)
+            search_needed = needs_retrieval(
+                structured_router, messages, state.get("summary", "")
+            )
         else:
             search_needed = rule_needs_retrieval(question)
         cost = time.perf_counter() - started
@@ -192,10 +208,13 @@ def build_graph(
             if state["context"]
             else PLAIN_PROMPT
         )
+        if state.get("summary"):
+            prompt = f"{prompt}\n\n（更早对话的摘要）\n{state['summary']}"
         reply = model.invoke([SystemMessage(content=prompt), *state["messages"]])
         return {"messages": [reply]}
 
     builder = StateGraph(ChatState)
+    builder.add_node("summarize", summarize)
     builder.add_node("router", router)
     builder.add_node("bm25", bm25_retrieve)
     builder.add_node("semantic", semantic_retrieve)
@@ -203,7 +222,8 @@ def build_graph(
     builder.add_node("rerank", rerank)
     builder.add_node("chatbot", chatbot)
 
-    builder.add_edge(START, "router")
+    builder.add_edge(START, "summarize")
+    builder.add_edge("summarize", "router")
     builder.add_conditional_edges(
         "router",
         lambda state: ["bm25", "semantic"] if state["search"] else "chatbot",
