@@ -21,17 +21,22 @@ SYSTEM_PROMPT = "你是客服助手，回答要简洁；需要当前时间时调
 THREAD_ID = "default"
 
 
-def main() -> None:
-    silence_beta_warning()
-    load_dotenv()
-
-    agent = create_agent(
-        init_chat_model(os.environ["MODEL"]),
+def build_agent(model):
+    """纯 create_agent 版本：图、工具循环、内存历史都由它自己管。"""
+    return create_agent(
+        model,
         tools=TOOLS,
         system_prompt=SYSTEM_PROMPT,
         # 内存 checkpointer：维持多轮历史，但进程结束就没了
         checkpointer=InMemorySaver(),
     )
+
+
+def main() -> None:
+    silence_beta_warning()
+    load_dotenv()
+
+    agent = build_agent(init_chat_model(os.environ["MODEL"]))
     config = {"configurable": {"thread_id": THREAD_ID}}
 
     print("输入内容开始对话，输入 exit / quit 结束。")
