@@ -1,0 +1,182 @@
+"""串行对比两个 RAG 实现：固定编排（router_chat）vs Agentic（rag_agent）。
+
+同一模型、同一套语料；A 先跑完全部轮次，B 再跑一遍（串行执行，不并行）。
+每轮记录：耗时、是否触发检索、答案、关键词校验。
+
+用法:
+    uv run python tests/compare_rag.py
+"""
+
+import io
+import os
+import time
+from contextlib import redirect_stdout
+
+from dotenv import load_dotenv
+from langchain.chat_models import init_chat_model
+from langchain.messages import HumanMessage
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+from langchain_reranker.rerankers import init_reranker
+from langgraph.checkpoint.memory import InMemorySaver
+
+from helpdesk.bm25 import build_index, load_chunks
+from helpdesk.rag import COLLECTION, INDEX_DIR
+from helpdesk.rag_agent import build_agent
+from helpdesk.router_chat import ROUTER_MAX_TOKENS, SEMANTIC_K, build_graph
+
+# (问题, 是否应该检索, 答案应包含的关键词)
+CORPUS = [
+    ("你好", False, []),
+    ("LangChain 里怎么定义一个工具？", True, ["tool"]),
+    ("向量库检索的基本流程是什么？", True, ["检索"]),
+    ("我刚才问过的技术问题是什么？", False, ["向量", "工具"]),
+    ("谢谢", False, []),
+    ("LangChain 里怎么定义一个工具？", False, ["tool"]),
+]
+
+
+def run(name: str, graph, is_agent: bool, thread_id: str) -> list[dict]:
+    """串行跑完整套语料，返回每轮记录。"""
+    config = {"configurable": {"thread_id": thread_id}}
+    rows = []
+    seen = 0  # 上轮结束时的消息条数，用来只看本轮新增内容
+    for index, (question, expect_search, keywords) in enumerate(CORPUS):
+        started = time.perf_counter()
+        # router_chat 的节点会打印决策日志，这里屏蔽掉以免干扰报告
+        with redirect_stdout(io.StringIO()):
+            result = graph.invoke({"messages": [HumanMessage(content=question)]}, config)
+        cost = time.perf_counter() - started
+
+        messages = result["messages"]
+        new_messages = messages[seen:]
+        seen = len(messages)
+
+        if is_agent:
+            # agent 版：本轮有没有调用检索工具
+            tools = [
+                call["name"]
+                for message in new_messages
+                if message.type == "ai"
+                for call in (message.tool_calls or [])
+            ]
+            searched = bool(tools)
+        else:
+            # 固定编排：router 判定检索时才会填充 context
+            searched = bool(result.get("context"))
+            tools = ["search"] if searched else []
+
+        answer = messages[-1].text
+        rows.append(
+            {
+                "index": index + 1,
+                "question": question,
+                "expect_search": expect_search,
+                "searched": searched,
+                "search_ok": searched == expect_search,
+                "answer": answer,
+                "answer_ok": any(word in answer for word in keywords) if keywords else True,
+                "cost": cost,
+                "messages": len(messages),
+                "tools": tools,
+            }
+        )
+    return rows
+
+
+def report(name: str, rows: list[dict]) -> None:
+    print(f"\n===== {name} =====")
+    for row in rows:
+        mark = "OK" if row["search_ok"] else "X"
+        print(
+            f"[{row['index']}] {row['cost'] * 1000:6.0f}ms  "
+            f"检索={'是' if row['searched'] else '否'} "
+            f"(期望{'是' if row['expect_search'] else '否'}) {mark}"
+        )
+        print(f"    Q: {row['question']}")
+        print(f"    A: {row['answer'][:160].replace(chr(10), ' ')}")
+
+    costs = [row["cost"] for row in rows]
+    search_ok = sum(row["search_ok"] for row in rows)
+    answer_ok = sum(row["answer_ok"] for row in rows)
+    print(
+        f"  汇总: 总 {sum(costs):.2f}s | 平均 {sum(costs) / len(costs) * 1000:.0f}ms"
+        f" | 检索判定 {search_ok}/{len(rows)} | 答案关键词 {answer_ok}/{len(rows)}"
+    )
+
+
+def compare(left: list[dict], right: list[dict]) -> None:
+    print("\n===== 逐轮对比 =====")
+    print("轮次 | 期望检索 | A 固定编排        | B Agentic")
+    for a, b in zip(left, right):
+        expect = "是" if a["expect_search"] else "否"
+        print(
+            f"  {a['index']}  |    {expect}     | "
+            f"{'检索' if a['searched'] else '不检索':6s} {a['cost'] * 1000:6.0f}ms | "
+            f"{'检索' if b['searched'] else '不检索':6s} {b['cost'] * 1000:6.0f}ms"
+        )
+
+    total_a = sum(row["cost"] for row in left)
+    total_b = sum(row["cost"] for row in right)
+    print(
+        f"  总计: A {total_a:.2f}s | B {total_b:.2f}s | 差值 {(total_b - total_a) * 1000:+.0f}ms"
+    )
+    print(
+        f"  检索判定正确: A {sum(r['search_ok'] for r in left)}/{len(left)}"
+        f" | B {sum(r['search_ok'] for r in right)}/{len(right)}"
+    )
+
+
+def main() -> None:
+    load_dotenv()
+
+    chunks = load_chunks()
+    bm25 = build_index(chunks)
+    embeddings = OpenAIEmbeddings(
+        model=os.environ["EMBEDDING_MODEL"],
+        base_url=os.environ["EMBEDDING_BASE_URL"],
+        api_key=os.environ["OPENAI_API_KEY"],
+        check_embedding_ctx_length=False,
+    )
+    retriever = Chroma(
+        collection_name=COLLECTION,
+        embedding_function=embeddings,
+        persist_directory=str(INDEX_DIR),
+    ).as_retriever(search_kwargs={"k": SEMANTIC_K})
+    reranker = init_reranker(
+        os.environ["RERANKER_MODEL"], base_url=os.environ["RERANKER_BASE_URL"]
+    )
+    print(f"语料分块 {len(chunks)} 条")
+
+    model = init_chat_model(os.environ["MODEL"])
+    router_model = init_chat_model(
+        os.environ["ROUTER_MODEL"],
+        base_url=os.environ["ROUTER_BASE_URL"],
+        api_key=os.environ["OPENAI_API_KEY"],
+        temperature=0,
+        max_tokens=ROUTER_MAX_TOKENS,
+    )
+
+    # 串行：A 跑完再跑 B；各自独立的 thread 与内存 checkpointer，互不污染
+    graph_a = build_graph(
+        model,
+        router_model,
+        bm25,
+        chunks,
+        retriever,
+        reranker,
+        InMemorySaver(),
+        "llm",
+    )
+    rows_a = run("A", graph_a, False, "rag-a")
+
+    graph_b = build_agent(model, bm25, chunks, retriever, reranker)
+    rows_b = run("B", graph_b, True, "rag-b")
+
+    report("A. 固定编排（router -> 并行召回 -> 重排 -> 生成）", rows_a)
+    report("B. Agentic（create_agent + 检索工具）", rows_b)
+    compare(rows_a, rows_b)
+
+
+if __name__ == "__main__":
+    main()
