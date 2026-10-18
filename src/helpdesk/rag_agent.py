@@ -18,8 +18,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from helpdesk.bm25 import search
 
-BM25_K = 40
-SEMANTIC_K = 20
+BM25_K = 10
 TOP_K = 5
 
 # Agent 版没有固定的 router 节点，靠这段提示词约束「什么时候查、查到什么程度、查不到怎么说」

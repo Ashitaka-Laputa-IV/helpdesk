@@ -43,8 +43,8 @@ from helpdesk.rag import COLLECTION, INDEX_DIR
 from helpdesk.summarize import compress_history
 
 DB_PATH = Path(__file__).resolve().parents[2] / ".router_chat.db"
-BM25_K = 40
-SEMANTIC_K = 20
+BM25_K = 10
+SEMANTIC_K = 15
 TOP_K = 5
 ROUTER_MAX_TOKENS = 128  # 留出余量：历史较长时模型偶尔会多写几个 token
 
