@@ -1,19 +1,24 @@
-"""检索链路基准：bm25 / 向量 / rerank 的耗时与召回率。
+"""检索链路基准：bm25 / 向量 / rerank 的耗时与召回质量。
 
-评测集自动构建：从语料里抽取标题唯一的文档，用其 H1 标题当查询，正解就是该文档本身。
-每个查询重复跑 R 次取平均，分别统计各阶段的耗时与 Recall@K。
+评测集两种来源：
+  1) 内置标题集：文档 H1 标题当查询（简单档，字面重合多）。
+  2) `--eval-set` 指定的 JSON（如 data/eval/queries.json），含 title / paraphrase 两档。
 
-指标口径：
-  - Recall@K：正解文档是否出现在该阶段的 top-K 里（按文件路径判断）
-  - 候选池召回：bm25 ∪ 向量的去重结果里是否含正解（rerank 的上限）
-  - 条件召回：rerank 命中数 / 候选池命中数（衡量重排本身有没有把正解挤出去）
+指标：
+  - Recall@K：正解文档是否出现在该阶段 top-K
+  - MRR：正解首次出现排名的倒数均值（1/rank），衡量排序质量而不只看"有没有进前 K"
+  - 候选池召回：bm25 ∪ 向量的并集是否含正解，即 rerank 的理论上限
+  - 不重排基线：直接取候选池前 5 条（bm25 在前、向量补位）
+  - 重排保真度：rerank 命中 / 候选池命中
 
 用法:
     uv run python tests/benchmark_retrieval.py
-    uv run python tests/benchmark_retrieval.py --queries 40 --repeat 3
+    uv run python tests/benchmark_retrieval.py --eval-set data/eval/queries.json --tier paraphrase
+    uv run python tests/benchmark_retrieval.py --bm25-k 10 --semantic-k 15 --repeat 3
 """
 
 import argparse
+import json
 import os
 import random
 import re
@@ -35,8 +40,8 @@ from helpdesk.router_chat import SEMANTIC_K
 SEED = 42
 
 
-def build_queries(limit: int) -> list[dict]:
-    """抽样：标题唯一的文档，标题当查询、文件路径当正解。"""
+def build_title_queries(limit: int) -> list[dict]:
+    """内置简单档：标题唯一的文档，标题当查询、文件路径当正解。"""
     titles: dict[str, list[str]] = {}
     for path in sorted(DOCS_DIR.rglob("*.md")):
         match = re.search(r"^#\s+(.+)$", path.read_text(encoding="utf-8"), re.M)
@@ -54,18 +59,47 @@ def build_queries(limit: int) -> list[dict]:
     return pool[:limit]
 
 
+def load_eval_set(path: str, tier: str | None) -> list[dict]:
+    rows = json.loads(Path(path).read_text(encoding="utf-8"))
+    if tier:
+        rows = [row for row in rows if row["tier"] == tier]
+    return [{"query": row["query"], "target": row["target"]} for row in rows]
+
+
 def percentile(values: list[float], ratio: float) -> float:
     ordered = sorted(values)
-    index = min(len(ordered) - 1, int(len(ordered) * ratio))
-    return ordered[index]
+    return ordered[min(len(ordered) - 1, int(len(ordered) * ratio))]
+
+
+def rank_of(sources: list[str], target: str) -> int:
+    """正解在结果里的名次（1 起），没出现返回 0。"""
+    for index, source in enumerate(sources, 1):
+        if source == target:
+            return index
+    return 0
+
+
+def rrf_fuse(bm25_sources: list[str], vector_sources: list[str], top: int) -> list[str]:
+    """Reciprocal Rank Fusion：只按名次融合，无需调分数尺度。
+
+    作为"不花 rerank 那 500ms"的公平基线——直接取候选池前 5 会偏向 bm25，太悲观。
+    """
+    scores: dict[str, float] = {}
+    for sources in (bm25_sources, vector_sources):
+        for rank, source in enumerate(sources, 1):
+            scores[source] = scores.get(source, 0.0) + 1.0 / (60 + rank)
+    return [source for source, _ in sorted(scores.items(), key=lambda x: -x[1])[:top]]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="检索链路基准")
-    parser.add_argument("--queries", type=int, default=40, help="查询条数")
+    parser.add_argument("--queries", type=int, default=40, help="内置标题集的条数")
     parser.add_argument("--repeat", type=int, default=3, help="每条查询重复次数")
     parser.add_argument("--bm25-k", type=int, default=BM25_K, help="bm25 召回条数")
     parser.add_argument("--semantic-k", type=int, default=SEMANTIC_K, help="向量召回条数")
+    parser.add_argument("--eval-set", help="评测集 JSON 路径，不传则用内置标题集")
+    parser.add_argument("--tier", choices=["title", "paraphrase"], help="只跑某一档")
+    parser.add_argument("--top-k", type=int, default=TOP_K, help="rerank 后进入上下文的条数")
     args = parser.parse_args()
 
     load_dotenv()
@@ -86,8 +120,14 @@ def main() -> None:
         os.environ["RERANKER_MODEL"], base_url=os.environ["RERANKER_BASE_URL"]
     )
 
-    queries = build_queries(args.queries)
-    # 预热：避免首次调用的建连/加载计入统计
+    if args.eval_set:
+        queries = load_eval_set(args.eval_set, args.tier)
+        source_desc = f"{Path(args.eval_set).name}" + (f" [{args.tier}]" if args.tier else "")
+    else:
+        queries = build_title_queries(args.queries)
+        source_desc = "内置标题集"
+
+    # 预热，避免首次建连/加载计入统计
     warm = queries[0]["query"]
     search(bm25, chunks, warm, args.bm25_k)
     retriever.invoke(warm)
@@ -96,10 +136,8 @@ def main() -> None:
         query=warm,
     )
 
-    stats = {
-        name: {"time": [], "hit": 0}
-        for name in ("bm25", "vector", "pool", "base", "rerank")
-    }
+    stages = ("bm25", "vector", "pool", "base", "rrf", "rerank")
+    stats = {name: {"time": [], "hit": 0, "rr": 0.0} for name in stages}
     total_time: list[float] = []
 
     for _ in range(args.repeat):
@@ -127,15 +165,16 @@ def main() -> None:
                 key = (doc.metadata["source"], doc.page_content)
                 if key not in seen:
                     seen.add(key)
-                    candidates.append(
-                        {"source": key[0], "text": key[1]}
-                    )
+                    candidates.append({"source": key[0], "text": key[1]})
 
             started = time.perf_counter()
             ranked = reranker.compress_documents(
-                [Document(page_content=c["text"], metadata={"source": c["source"]}) for c in candidates],
+                [
+                    Document(page_content=c["text"], metadata={"source": c["source"]})
+                    for c in candidates
+                ],
                 query=query,
-            )[:TOP_K]
+            )[: args.top_k]
             stats["rerank"]["time"].append((time.perf_counter() - started) * 1000)
             total_time.append(
                 stats["bm25"]["time"][-1]
@@ -143,45 +182,59 @@ def main() -> None:
                 + stats["rerank"]["time"][-1]
             )
 
-            stats["bm25"]["hit"] += target in bm25_sources
-            stats["vector"]["hit"] += target in vector_sources
-            stats["pool"]["hit"] += target in {c["source"] for c in candidates}
-            # 不重排基线：直接取候选池前 TOP_K 条（bm25 在前，向量补位）
-            stats["base"]["hit"] += target in {c["source"] for c in candidates[:TOP_K]}
-            stats["rerank"]["hit"] += target in {d.metadata["source"] for d in ranked}
+            results = {
+                "bm25": bm25_sources,
+                "vector": vector_sources,
+                "pool": [c["source"] for c in candidates],
+                "base": [c["source"] for c in candidates[: args.top_k]],
+                "rrf": rrf_fuse(bm25_sources, vector_sources, args.top_k),
+                "rerank": [doc.metadata["source"] for doc in ranked],
+            }
+            for name, sources in results.items():
+                rank = rank_of(sources, target)
+                if rank:
+                    stats[name]["hit"] += 1
+                    stats[name]["rr"] += 1.0 / rank
 
     samples = len(queries) * args.repeat
-    print(f"查询 {len(queries)} 条 × 重复 {args.repeat} 次 = {samples} 次采样")
+    print(f"评测集 {source_desc} | 查询 {len(queries)} 条 × 重复 {args.repeat} 次 = {samples} 次采样")
     print(
         f"语料 {len(chunks)} 块 | bm25 K={args.bm25_k} | "
-        f"向量 K={args.semantic_k} | rerank 取 {TOP_K}"
+        f"向量 K={args.semantic_k} | rerank 取 {args.top_k}"
     )
     print()
-    print(f"{'阶段':<14}{'平均':>9}{'中位':>9}{'P95':>9}{'召回率':>10}")
+    print(f"{'阶段':<13}{'平均':>9}{'中位':>9}{'P95':>9}{'Recall':>9}{'MRR':>8}")
+
     labels = {
         "bm25": f"bm25 top{args.bm25_k}",
         "vector": f"向量 top{args.semantic_k}",
-        "pool": "候选池(去重)",
-        "base": f"不重排 top{TOP_K}",
-        "rerank": f"rerank top{TOP_K}",
+        "pool": "候选池",
+        "base": f"不重排 top{args.top_k}",
+        "rrf": f"RRF top{args.top_k}",
+        "rerank": f"rerank top{args.top_k}",
     }
-    for name in ("bm25", "vector", "pool", "base", "rerank"):
+    for name in stages:
         times = stats[name]["time"]
         time_cell = f"{statistics.mean(times):.1f}ms" if times else "-"
         median_cell = f"{statistics.median(times):.1f}ms" if times else "-"
         p95_cell = f"{percentile(times, 0.95):.1f}ms" if times else "-"
         recall = stats[name]["hit"] / samples * 100
+        mrr = stats[name]["rr"] / samples
         print(
-            f"{labels[name]:<14}{time_cell:>9}{median_cell:>9}{p95_cell:>9}{recall:>9.1f}%"
+            f"{labels[name]:<13}{time_cell:>9}{median_cell:>9}{p95_cell:>9}"
+            f"{recall:>8.1f}%{mrr:>8.3f}"
         )
 
     print()
-    print(f"整条链路（bm25 + 向量 + rerank 串行）: 平均 {statistics.mean(total_time):.0f}ms | 中位 {statistics.median(total_time):.0f}ms")
-    pool_recall = stats["pool"]["hit"]
-    if pool_recall:
+    print(
+        f"整条链路（bm25 + 向量 + rerank 串行）: "
+        f"平均 {statistics.mean(total_time):.0f}ms | 中位 {statistics.median(total_time):.0f}ms"
+    )
+    pool_hits = stats["pool"]["hit"]
+    if pool_hits:
         print(
-            f"重排保真度: rerank 命中 {stats['rerank']['hit']} / 候选池命中 {pool_recall}"
-            f" = {stats['rerank']['hit'] / pool_recall * 100:.1f}%"
+            f"重排保真度: rerank 命中 {stats['rerank']['hit']} / 候选池命中 {pool_hits}"
+            f" = {stats['rerank']['hit'] / pool_hits * 100:.1f}%"
         )
 
 
