@@ -9,6 +9,8 @@
 只提供构建函数，对比测试见 tests/compare_rag.py。
 """
 
+from concurrent.futures import ThreadPoolExecutor
+
 from langchain.agents import create_agent
 from langchain.tools import tool
 from langchain_core.documents import Document
@@ -44,10 +46,16 @@ def build_search_tool(bm25, chunks, retriever, reranker):
         Args:
             query: 检索关键词，写清技术名词即可，不要写成完整长句。
         """
-        # 1) 并行召回：bm25 关键词 + 向量语义，按 (来源, 原文) 去重
-        candidates = [{"source": s, "text": t} for _, s, t in search(bm25, chunks, query, BM25_K)]
+        # 1) 并行召回：bm25 与向量检索同时跑（前者本地计算，后者走 HTTP），按 (来源, 原文) 去重
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            bm25_future = pool.submit(search, bm25, chunks, query, BM25_K)
+            vector_future = pool.submit(retriever.invoke, query)
+            bm25_hits = bm25_future.result()
+            vector_docs = vector_future.result()
+
+        candidates = [{"source": s, "text": t} for _, s, t in bm25_hits]
         seen = {(c["source"], c["text"]) for c in candidates}
-        for doc in retriever.invoke(query):
+        for doc in vector_docs:
             key = (doc.metadata["source"], doc.page_content)
             if key not in seen:
                 seen.add(key)
