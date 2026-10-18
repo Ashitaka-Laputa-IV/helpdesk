@@ -7,3 +7,4 @@ data/langchain-docs/
 .chat.db*
 .bm25_chat.db*
 .router_chat.db*
+.router_chat_rrf.db*
