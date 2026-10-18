@@ -29,7 +29,6 @@ from helpdesk import DEFAULT_THREAD, DEFAULT_USER, silence_beta_warning, thread_
 from helpdesk.bm25 import build_index, load_chunks, search
 from helpdesk.rag import COLLECTION, INDEX_DIR
 from helpdesk.router_chat import (
-    BM25_K,
     PLAIN_PROMPT,
     SEMANTIC_K,
     SMALL_TALK,
@@ -42,8 +41,10 @@ from helpdesk.router_chat import (
 from helpdesk.summarize import compress_history
 
 DB_PATH = Path(__file__).resolve().parents[2] / ".router_chat_rrf.db"
-TOP_N = 5  # 融合后进入上下文的条数
-RRF_K = 60  # RRF 平滑常数，业界常用 60
+# 以下取值来自 tests/sweep_fusion.py 的参数扫描（英文改写档）
+BM25_K = 20  # 比重排版更深：RRF 只看名次，多召回不亏
+TOP_N = 8  # 融合后进入上下文的条数
+RRF_K = 20  # 平滑常数，扫描中 20 优于常用的 60
 
 
 def rrf_rank(bm25_docs: list[dict], semantic_docs: list[dict], top_n: int) -> list[dict]:

@@ -45,7 +45,7 @@ from helpdesk.summarize import compress_history
 DB_PATH = Path(__file__).resolve().parents[2] / ".router_chat.db"
 BM25_K = 10
 SEMANTIC_K = 15
-TOP_K = 5
+TOP_K = 8  # 参数扫描：top_n=5 只有 80% 召回，8 能到 90%
 ROUTER_MAX_TOKENS = 128  # 留出余量：历史较长时模型偶尔会多写几个 token
 
 # Router 提示：直接把 state["messages"] 当对话输入，规则放在 system 里。
