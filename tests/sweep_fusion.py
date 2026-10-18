@@ -29,7 +29,7 @@ from helpdesk.rag import COLLECTION, INDEX_DIR
 POOL_K = 30  # 一次召回的深度，需覆盖所有配置里最大的 k
 EVAL_PATH = Path(__file__).resolve().parents[1] / "data" / "eval" / "queries.json"
 
-BM25_KS = (10, 20)
+BM25_KS = (10, 20, 25)
 SEMANTIC_KS = (15, 25)
 RRF_KS = (20, 60)
 TOP_NS = (5, 8, 10)
