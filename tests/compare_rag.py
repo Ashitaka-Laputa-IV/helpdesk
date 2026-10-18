@@ -26,13 +26,14 @@ from helpdesk.rag_agent import build_agent
 from helpdesk.router_chat import ROUTER_MAX_TOKENS, SEMANTIC_K, build_graph
 
 # (问题, 是否应该检索, 答案应包含的关键词)
+# 语料是英文文档，查询也必须用英文，否则测到的是语种不匹配而不是检索能力
 CORPUS = [
-    ("你好", False, []),
-    ("LangChain 里怎么定义一个工具？", True, ["tool"]),
-    ("向量库检索的基本流程是什么？", True, ["检索"]),
-    ("我刚才问过的技术问题是什么？", False, ["向量", "工具"]),
-    ("谢谢", False, []),
-    ("LangChain 里怎么定义一个工具？", False, ["tool"]),
+    ("Hello", False, []),
+    ("How do I define a tool in LangChain?", True, ["tool"]),
+    ("What is the basic flow of vector store retrieval?", True, ["retriev", "vector"]),
+    ("What technical question did I just ask?", False, ["tool", "vector"]),
+    ("Thanks", False, []),
+    ("How do I define a tool in LangChain?", False, ["tool"]),
 ]
 
 
