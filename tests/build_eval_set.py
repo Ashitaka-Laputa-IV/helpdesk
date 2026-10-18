@@ -27,19 +27,20 @@ from helpdesk.rag import DOCS_DIR
 SEED = 42
 OUT_PATH = Path(__file__).resolve().parents[1] / "data" / "eval" / "queries.json"
 
-PROMPT = """下面是一篇技术文档的标题和其中一段内容。请站在使用者角度，针对这段内容提一个具体问题。
+PROMPT = """Below is a technical documentation page: its title and one excerpt from it.
+Write ONE question that a real user would ask, which this excerpt answers.
 
-[文档标题]
+[Title]
 {title}
 
-[文档片段]
+[Excerpt]
 {chunk}
 
-要求：
-- 用中文口语化提问，像真实用户求助那样
-- 问题要贴合标题主题，不要跑到无关细节上
-- 不要整句照抄标题或原文术语
-- 只输出问题本身，不要解释"""
+Rules:
+- Ask in English, natural/casual phrasing like in a support chat
+- Stay on the topic of the title, do not drift into unrelated details
+- Do not copy the title or sentences verbatim
+- Output only the question, no explanation"""
 
 
 def collect_docs() -> dict[str, dict]:

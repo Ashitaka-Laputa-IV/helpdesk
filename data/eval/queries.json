@@ -7,7 +7,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "怎么实现时间旅行功能，现在这个iframe加载的页面能回到之前的状态吗？",
+    "query": "How does the time travel feature work in practice?",
     "target": "oss/python/langchain/frontend/time-travel.md",
     "title": "Time travel"
   },
@@ -19,7 +19,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "我用这个工具生成linkedin图片，但生成的图太杂乱，怎么改prompt才能让画面更干净、重点更突出？",
+    "query": "How do I create a compelling social media image using the image generation tool, and what should I include in the prompt to make it stand out?",
     "target": "oss/python/deepagents/content-builder.md",
     "title": "Build a content builder agent"
   },
@@ -31,7 +31,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "怎么才能让 reviewer 一次性看到所有需要审核的工具调用，而不是一个一个来？",
+    "query": "What happens if I don't respond to an interrupt in the human-in-the-loop system?",
     "target": "oss/python/concepts/human-in-the-loop.md",
     "title": "Human-in-the-loop overview"
   },
@@ -43,7 +43,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "怎么用 MCPAdapter 搞一个远程的文档查询服务，比如我有个网页，想通过 HTTP 请求直接调用它？",
+    "query": "How do I set up MCP to connect to a remote documentation server via HTTP?",
     "target": "oss/python/langchain/mcp/index.md",
     "title": "Model Context Protocol (MCP)"
   },
@@ -55,7 +55,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "我听说从 langgraph-supervisor 迁移后，子代理里的中断会传到外层图，那我现在在子工具里用了 interrupt，外面的回调能收到并继续执行吗？具体怎么保证流程不中断？",
+    "query": "Can I use interrupts in a subagent tool and have the flow resume in the main agent after the tool finishes?",
     "target": "oss/python/migrate/langgraph-supervisor.md",
     "title": "Migrate from langgraph-supervisor"
   },
@@ -67,7 +67,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "怎么让主题切换的时候，页面样式能实时跟着变化，而不是等下次刷新才生效？",
+    "query": "How does the subagent streaming feature handle theme detection and apply it in real time?",
     "target": "oss/python/deepagents/frontend/subagent-streaming.md",
     "title": "Subagent streaming"
   },
@@ -79,7 +79,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "我刚装了LangChain，想用OpenAI，应该用哪个命令？是pip还是uv？",
+    "query": "I want to use OpenAI with LangChain — how do I install the required package?",
     "target": "oss/python/langchain/install.md",
     "title": "Install LangChain"
   },
@@ -91,7 +91,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "怎么在中间件里加一个流转换器，把工具调用的实时日志也发出去？",
+    "query": "Can I use custom stream transformers in middleware, and do I need a specific version of LangChain to do so?",
     "target": "oss/python/langchain/middleware/custom.md",
     "title": "Custom middleware"
   },
@@ -103,7 +103,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "我是一个新手开发者，想快速做个原型测试，但又担心用Graph API太麻烦，用Functional API又怕不够灵活，你们能不能给我个具体建议，到底什么时候该选Functional，什么时候该用Graph？",
+    "query": "Should I use the Graph API or the Functional API if I just need to build a simple, step-by-step workflow with a few conditions?",
     "target": "oss/python/langgraph/choosing-apis.md",
     "title": "Choosing between Graph and Functional APIs"
   },
@@ -115,7 +115,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "我想要用缓存来存嵌入向量，但不知道怎么设置namespace，会不会设置错了导致嵌入结果混乱？",
+    "query": "If I want to cache both document and query embeddings using the same store, what should I set for the `query_embedding_cache` parameter?",
     "target": "oss/python/integrations/embeddings/index.md",
     "title": "Embedding model integrations"
   },
@@ -127,7 +127,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "这些公司用GenAI做产品的时候，具体是怎么把大模型和实际业务流程打通的？有没有一个通用的步骤或者模板？",
+    "query": "Can you show me a real-world example of how a company used GenAI to improve customer support?",
     "target": "oss/python/langgraph/case-studies.md",
     "title": "Case studies"
   },
@@ -139,7 +139,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "怎么才能确保agent不会不小心写坏数据库或者泄露敏感文件？",
+    "query": "How can I ensure an agent doesn't accidentally or maliciously modify sensitive data in a database or API?",
     "target": "oss/python/security-policy.md",
     "title": "Security policy"
   },
@@ -151,7 +151,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "怎么把Claude模型集成到我自己的项目里，具体步骤是什么？",
+    "query": "Can I use Anthropic models with LangChain, and how do I get started?",
     "target": "oss/python/integrations/providers/anthropic.md",
     "title": "Anthropic (Claude) integrations"
   },
@@ -163,7 +163,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "怎么把Fireworks的聊天模型和我的本地Agent连起来用啊？",
+    "query": "How do I set up Fireworks AI integration in my Python project?",
     "target": "oss/python/integrations/providers/fireworks.md",
     "title": "Fireworks integrations"
   },
@@ -175,7 +175,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "如果我在函数里定义了一个叫 send_email 的工具，那中间件中断的条件是不是就自动匹配上了？我担心手动改名字会出问题，有没有什么检查方法？",
+    "query": "If I have a tool called `send_email` in my agent, how do I set up a Human-in-the-Loop interrupt specifically for that tool?",
     "target": "oss/python/langchain/middleware/overview.md",
     "title": "Middleware overview"
   },
@@ -187,7 +187,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "我这边想用 Valkey 做向量存储，它支持的数据库类型有哪些？具体怎么配置呢？",
+    "query": "Can I use PGVector or ValkeyVectorStore with LangChain, and which ones are supported for vector storage?",
     "target": "oss/python/integrations/vectorstores/index.md",
     "title": "Vector store integrations"
   },
@@ -199,7 +199,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "如果我选择的SDK比较旧，但系统还是推荐它，这是正常的吗？怎么判断它是不是真的最合适的？",
+    "query": "How does the tool selection logic work when multiple SDKs are available?",
     "target": "oss/python/langchain/frontend/tool-calling.md",
     "title": "Tool calling"
   },
@@ -211,7 +211,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "我这个项目里用了自定义的本地包，配置文件里dependencies怎么写才对？",
+    "query": "How do I specify dependencies in my LangGraph application configuration file?",
     "target": "oss/python/langgraph/application-structure.md",
     "title": "Application structure"
   },
@@ -223,7 +223,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "怎么用这个 voice agent 让它记住上次对话的内容，比如顾客说要加一个芝士，下一次还能记得说“之前加过芝士”？",
+    "query": "How can I make a voice agent remember previous parts of the conversation so it can reference them when responding?",
     "target": "oss/python/langchain/voice-agent.md",
     "title": "Build a voice agent with LangChain"
   },
@@ -235,7 +235,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "怎么知道这个页面主题切换的时候，iframe 里的内容会跟着更新？",
+    "query": "How does the declarative generative UI handle theme changes during runtime?",
     "target": "oss/python/langchain/frontend/declarative-generative-ui.md",
     "title": "Declarative generative UI"
   },
@@ -247,7 +247,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "怎么让这个分析代理在看到文件后，能自动根据内容生成一段总结，然后用这总结来回答我后面的问题？",
+    "query": "How can I add a SQL skill to my agent so it can query databases during a conversation?",
     "target": "oss/python/langchain/deep-agent-from-scratch.md",
     "title": "Build a data analysis agent from scratch"
   },
@@ -259,7 +259,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "我用 LangChain 做语义搜索，想把 PostgreSQL 里的数据存成向量索引，具体怎么配置 embedding 和表名才能让搜索准确呢？",
+    "query": "How do I set up a semantic search engine using LangChain and a PostgreSQL database?",
     "target": "oss/python/langchain/knowledge-base.md",
     "title": "Build a semantic search engine with LangChain"
   },
@@ -271,7 +271,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "怎么让客服在处理问题时，根据当前步骤自动切换话术，比如到了保修查询这步就自动用保修相关的模板？",
+    "query": "How do I set up different steps in the support workflow so that the agent knows which step to take next based on the user's input?",
     "target": "oss/python/langchain/multi-agent/handoffs-customer-support.md",
     "title": "Build customer support with handoffs"
   },
@@ -283,7 +283,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "我用的是RecursiveCharacterTextSplitter，但发现有些段落被拆得太碎了，怎么调整才能让每个chunk保持完整的意思？",
+    "query": "What's the best text splitter to use for most document chunking tasks?",
     "target": "oss/python/integrations/splitters/index.md",
     "title": "Text splitter integrations"
   },
@@ -295,7 +295,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "我用 LangChain 搭了一个天气查询的 agent，结果输出里显示 content_blocks，这个是啥意思？怎么才能看到实际的天气信息？",
+    "query": "Can I use LangChain to build an agent that fetches weather information for a city?",
     "target": "oss/python/langchain/overview.md",
     "title": "LangChain overview"
   },
@@ -307,7 +307,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "怎么用 pytest fixture 共享 fake model，才能确保每次测试都用同一个模拟模型而不重复创建？",
+    "query": "How can I reuse a fake model in multiple unit tests without duplicating code?",
     "target": "oss/python/langchain/test/unit-testing.md",
     "title": "Unit testing"
   },
@@ -319,7 +319,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "我遇到问题想问一下，有没有人用过社区 Slack，能不能帮忙看看我这个模型部署的问题？",
+    "query": "Where can I get help if I'm stuck with a LangChain issue?",
     "target": "oss/python/langchain/get-help.md",
     "title": "Get help"
   },
@@ -331,7 +331,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "如果我用LangSmith的agent server来部署，和直接用Claude Agent SDK自建服务器比，有什么关键区别我需要注意？",
+    "query": "What's the difference between using the Claude Agent SDK and LangSmith's managed agent server when it comes to setup and security?",
     "target": "oss/python/deepagents/comparison.md",
     "title": "Comparison with Claude Agent SDK"
   },
@@ -343,7 +343,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "如果评分过程中达到了最大迭代次数，但系统还是显示需要修改，我该怎么判断是真正需要改，还是只是迭代次数用完了？",
+    "query": "What happens if the grader returns \"needs_revision\" after reaching max_iterations, and how do I detect that the iteration limit has been hit?",
     "target": "oss/python/deepagents/rubric.md",
     "title": "Grading rubrics"
   },
@@ -355,7 +355,7 @@
   },
   {
     "tier": "paraphrase",
-    "query": "怎么用Ollama的嵌入模型来实现文本向量搜索？",
+    "query": "Can I use Ollama with LangChain for text generation or embeddings?",
     "target": "oss/python/integrations/providers/ollama.md",
     "title": "Ollama integrations"
   }

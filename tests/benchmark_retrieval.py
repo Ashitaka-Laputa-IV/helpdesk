@@ -79,6 +79,19 @@ def rank_of(sources: list[str], target: str) -> int:
     return 0
 
 
+def top_distinct(sources: list[str], k: int) -> list[str]:
+    """按文档去重后取前 k：避免同一文档的多个分块挤占名额。"""
+    picked: list[str] = []
+    seen: set[str] = set()
+    for source in sources:
+        if source not in seen:
+            seen.add(source)
+            picked.append(source)
+        if len(picked) == k:
+            break
+    return picked
+
+
 def rrf_fuse(bm25_sources: list[str], vector_sources: list[str], top: int) -> list[str]:
     """Reciprocal Rank Fusion：只按名次融合，无需调分数尺度。
 
@@ -136,7 +149,7 @@ def main() -> None:
         query=warm,
     )
 
-    stages = ("bm25", "vector", "pool", "base", "rrf", "rerank")
+    stages = ("bm25", "vector", "pool", "base", "rrf", "rerank", "rerank_uniq")
     stats = {name: {"time": [], "hit": 0, "rr": 0.0} for name in stages}
     total_time: list[float] = []
 
@@ -168,13 +181,15 @@ def main() -> None:
                     candidates.append({"source": key[0], "text": key[1]})
 
             started = time.perf_counter()
-            ranked = reranker.compress_documents(
+            # 保留完整排名，用于"按文档去重"的对照
+            ordered = reranker.compress_documents(
                 [
                     Document(page_content=c["text"], metadata={"source": c["source"]})
                     for c in candidates
                 ],
                 query=query,
-            )[: args.top_k]
+            )
+            ranked = ordered[: args.top_k]
             stats["rerank"]["time"].append((time.perf_counter() - started) * 1000)
             total_time.append(
                 stats["bm25"]["time"][-1]
@@ -189,6 +204,9 @@ def main() -> None:
                 "base": [c["source"] for c in candidates[: args.top_k]],
                 "rrf": rrf_fuse(bm25_sources, vector_sources, args.top_k),
                 "rerank": [doc.metadata["source"] for doc in ranked],
+                "rerank_uniq": top_distinct(
+                    [doc.metadata["source"] for doc in ordered], args.top_k
+                ),
             }
             for name, sources in results.items():
                 rank = rank_of(sources, target)
@@ -212,6 +230,7 @@ def main() -> None:
         "base": f"不重排 top{args.top_k}",
         "rrf": f"RRF top{args.top_k}",
         "rerank": f"rerank top{args.top_k}",
+        "rerank_uniq": f"rerank 去重top{args.top_k}",
     }
     for name in stages:
         times = stats[name]["time"]
