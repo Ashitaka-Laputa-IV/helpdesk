@@ -50,7 +50,11 @@ def invoke_streaming(graph, payload, config):
         payload, config, stream_mode=["messages", "values"]
     ):
         if mode == "messages":
-            message, _metadata = chunk
+            message, metadata = chunk
+            # 只认"回答节点"吐出的 token，否则会把 router / 工具决策那次调用的
+            # 首个 chunk 误当成首字（A 是 chatbot 节点，create_agent 里是 model）
+            if metadata.get("langgraph_node") not in {"chatbot", "model", "agent"}:
+                continue
             if ttft is None and getattr(message, "text", ""):
                 ttft = time.perf_counter() - started
         else:

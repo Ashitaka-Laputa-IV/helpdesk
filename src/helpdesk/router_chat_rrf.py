@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage, SystemMessage
 from langchain_chroma import Chroma
+from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
@@ -72,11 +73,17 @@ def build_graph(
     checkpointer=None,
     router_mode: str = "rule",
     top_n: int = TOP_N,
+    ranking: str = "rrf",
+    reranker=None,
 ):
-    """构建并编译 chat 图（检索后走 RRF，不重排）。"""
-    structured_router = router_model.with_structured_output(
-        __import__("helpdesk.router_chat", fromlist=["RouteDecision"]).RouteDecision
-    )
+    """构建并编译 chat 图。
+
+    ranking 决定检索后如何排序，用于横向评测：
+      - "rrf"（默认）：按名次倒数融合
+      - "none"：沿用召回顺序（bm25 在前、向量补位）
+      - "rerank"：用传入的 reranker 重新打分
+    """
+    structured_router = router_model.with_structured_output(RouteDecision)
 
     def summarize(state: ChatState) -> dict:
         """历史超预算时把较早的对话压成摘要，控制上下文长度。"""
@@ -111,8 +118,28 @@ def build_graph(
             ]
         }
 
-    def rrf(state: ChatState) -> dict:
-        fused = rrf_rank(state["bm25_docs"], state["semantic_docs"], top_n)
+    def rank(state: ChatState) -> dict:
+        """按 ranking 指定的方式挑出进入上下文的文档。"""
+        question = state["messages"][-1].text
+        if ranking == "none":
+            merged, seen = [], set()
+            for doc in state["bm25_docs"] + state["semantic_docs"]:
+                key = (doc["source"], doc["text"])
+                if key not in seen:
+                    seen.add(key)
+                    merged.append(doc)
+            fused = merged[:top_n]
+        elif ranking == "rerank":
+            documents = [
+                Document(page_content=d["text"], metadata={"source": d["source"]})
+                for d in state["bm25_docs"] + state["semantic_docs"]
+            ]
+            fused = [
+                {"source": doc.metadata["source"], "text": doc.page_content}
+                for doc in reranker.compress_documents(documents, query=question)[:top_n]
+            ]
+        else:
+            fused = rrf_rank(state["bm25_docs"], state["semantic_docs"], top_n)
         return {
             "context": "\n\n".join(f"[{d['source']}] {d['text']}" for d in fused)
         }
@@ -131,7 +158,7 @@ def build_graph(
     builder.add_node("router", router)
     builder.add_node("bm25", bm25_retrieve)
     builder.add_node("semantic", semantic_retrieve)
-    builder.add_node("rrf", rrf)
+    builder.add_node("rank", rank)
     builder.add_node("chatbot", chatbot)
 
     builder.add_edge(START, "summarize")
@@ -140,9 +167,9 @@ def build_graph(
         "router",
         lambda state: ["bm25", "semantic"] if state["search"] else "chatbot",
     )
-    builder.add_edge("bm25", "rrf")
-    builder.add_edge("semantic", "rrf")
-    builder.add_edge("rrf", "chatbot")
+    builder.add_edge("bm25", "rank")
+    builder.add_edge("semantic", "rank")
+    builder.add_edge("rank", "chatbot")
     builder.add_edge("chatbot", END)
     return builder.compile(checkpointer=checkpointer)
 
