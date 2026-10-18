@@ -37,17 +37,38 @@ CORPUS = [
 ]
 
 
+def invoke_streaming(graph, payload, config):
+    """流式跑一轮，返回 (首字耗时, 总耗时, 最终状态)。
+
+    TTFT 取第一个带文本的 chunk，只计到"开始吐字"为止；
+    后续生成过程再长也不计入，这更贴近用户感知的响应时间。
+    """
+    started = time.perf_counter()
+    ttft = None
+    final = None
+    for mode, chunk in graph.stream(
+        payload, config, stream_mode=["messages", "values"]
+    ):
+        if mode == "messages":
+            message, _metadata = chunk
+            if ttft is None and getattr(message, "text", ""):
+                ttft = time.perf_counter() - started
+        else:
+            final = chunk
+    return ttft, time.perf_counter() - started, final
+
+
 def run(name: str, graph, is_agent: bool, thread_id: str) -> list[dict]:
     """串行跑完整套语料，返回每轮记录。"""
     config = {"configurable": {"thread_id": thread_id}}
     rows = []
     seen = 0  # 上轮结束时的消息条数，用来只看本轮新增内容
     for index, (question, expect_search, keywords) in enumerate(CORPUS):
-        started = time.perf_counter()
         # router_chat 的节点会打印决策日志，这里屏蔽掉以免干扰报告
         with redirect_stdout(io.StringIO()):
-            result = graph.invoke({"messages": [HumanMessage(content=question)]}, config)
-        cost = time.perf_counter() - started
+            ttft, cost, result = invoke_streaming(
+                graph, {"messages": [HumanMessage(content=question)]}, config
+            )
 
         messages = result["messages"]
         new_messages = messages[seen:]
@@ -77,6 +98,7 @@ def run(name: str, graph, is_agent: bool, thread_id: str) -> list[dict]:
                 "search_ok": searched == expect_search,
                 "answer": answer,
                 "answer_ok": any(word in answer for word in keywords) if keywords else True,
+                "ttft": ttft,
                 "cost": cost,
                 "messages": len(messages),
                 "tools": tools,
@@ -89,8 +111,9 @@ def report(name: str, rows: list[dict]) -> None:
     print(f"\n===== {name} =====")
     for row in rows:
         mark = "OK" if row["search_ok"] else "X"
+        ttft = f"{row['ttft'] * 1000:6.0f}ms" if row["ttft"] else "     -"
         print(
-            f"[{row['index']}] {row['cost'] * 1000:6.0f}ms  "
+            f"[{row['index']}] 首字 {ttft}  总 {row['cost'] * 1000:6.0f}ms  "
             f"检索={'是' if row['searched'] else '否'} "
             f"(期望{'是' if row['expect_search'] else '否'}) {mark}"
         )
@@ -98,29 +121,41 @@ def report(name: str, rows: list[dict]) -> None:
         print(f"    A: {row['answer'][:160].replace(chr(10), ' ')}")
 
     costs = [row["cost"] for row in rows]
+    ttfts = [row["ttft"] for row in rows if row["ttft"]]
     search_ok = sum(row["search_ok"] for row in rows)
     answer_ok = sum(row["answer_ok"] for row in rows)
     print(
-        f"  汇总: 总 {sum(costs):.2f}s | 平均 {sum(costs) / len(costs) * 1000:.0f}ms"
+        f"  汇总: 首字平均 {sum(ttfts) / len(ttfts) * 1000:.0f}ms"
+        f" | 总耗时 {sum(costs):.2f}s"
         f" | 检索判定 {search_ok}/{len(rows)} | 答案关键词 {answer_ok}/{len(rows)}"
     )
 
 
 def compare(left: list[dict], right: list[dict]) -> None:
-    print("\n===== 逐轮对比 =====")
-    print("轮次 | 期望检索 | A 固定编排        | B Agentic")
+    print("\n===== 逐轮对比（首字耗时，括号内为总耗时）=====")
+    print("轮次 | 期望检索 | A 固定编排            | B Agentic")
     for a, b in zip(left, right):
         expect = "是" if a["expect_search"] else "否"
-        print(
-            f"  {a['index']}  |    {expect}     | "
-            f"{'检索' if a['searched'] else '不检索':6s} {a['cost'] * 1000:6.0f}ms | "
-            f"{'检索' if b['searched'] else '不检索':6s} {b['cost'] * 1000:6.0f}ms"
-        )
 
+        def cell(row: dict) -> str:
+            ttft = f"{row['ttft'] * 1000:.0f}ms" if row["ttft"] else "-"
+            return (
+                f"{'检索' if row['searched'] else '不检索':6s} "
+                f"{ttft:>7s} ({row['cost'] * 1000:.0f}ms)"
+            )
+
+        print(f"  {a['index']}  |    {expect}     | {cell(a):22s} | {cell(b)}")
+
+    ttft_a = [r["ttft"] for r in left if r["ttft"]]
+    ttft_b = [r["ttft"] for r in right if r["ttft"]]
+    print(
+        f"  首字平均: A {sum(ttft_a) / len(ttft_a) * 1000:.0f}ms"
+        f" | B {sum(ttft_b) / len(ttft_b) * 1000:.0f}ms"
+    )
     total_a = sum(row["cost"] for row in left)
     total_b = sum(row["cost"] for row in right)
     print(
-        f"  总计: A {total_a:.2f}s | B {total_b:.2f}s | 差值 {(total_b - total_a) * 1000:+.0f}ms"
+        f"  总耗时: A {total_a:.2f}s | B {total_b:.2f}s | 差值 {(total_b - total_a) * 1000:+.0f}ms"
     )
     print(
         f"  检索判定正确: A {sum(r['search_ok'] for r in left)}/{len(left)}"
