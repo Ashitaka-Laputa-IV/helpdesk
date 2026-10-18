@@ -1,4 +1,4 @@
-"""串行对比两个多轮 chatbot：纯 create_agent vs create_agent + graph 编排。
+"""串行对比两个多轮 chatbot：纯 create_agent vs LangGraph 手工编排。
 
 同一模型、同一套语料；先跑完 A 的全部轮次，再跑完 B（串行执行，不并行）。
 每轮记录耗时、消息条数、工具调用与校验结果，最后输出逐轮对比。
@@ -106,7 +106,7 @@ def report(name: str, rows: list[dict]) -> None:
 
 def compare(left: list[dict], right: list[dict]) -> None:
     print("\n===== 逐轮耗时对比 =====")
-    print("轮次 | A 纯 create_agent | B graph 编排 | 差值")
+    print("轮次 | A 纯 create_agent | B LangGraph 编排 | 差值")
     for a, b in zip(left, right):
         diff = (b["cost"] - a["cost"]) * 1000
         print(
@@ -132,7 +132,7 @@ def main() -> None:
     rows_b = run("B", build_graph(model), "cmp-b")
 
     report("A. 纯 create_agent", rows_a)
-    report("B. create_agent + graph 编排", rows_b)
+    report("B. LangGraph 手工编排", rows_b)
     compare(rows_a, rows_b)
 
 

@@ -1,19 +1,20 @@
-# create_agent 与 graph 编排：两个 chatbot 的对比
+# create_agent 与 LangGraph 编排：两个 chatbot 的对比
 
 ## 目标
 
-同一个模型、同一套语料，对比两个多轮 chatbot：
+同一个模型（`init_chat_model`）、同一套语料，对比两个多轮 chatbot：
 
 | | 实现 | 构建函数 |
 |---|---|---|
 | **A** | 纯 `create_agent` | `agentic_chat.build_agent(model)` |
-| **B** | `create_agent` + `StateGraph` 编排 | `agent_graph.build_graph(model)` |
+| **B** | 用 `llm = init_chat_model(...)` 手工搭 LangGraph | `agent_graph.build_graph(llm)` |
 
-两者都只用内存历史（`InMemorySaver`），不落盘；两个模块只提供构建函数，对话由测试脚本驱动。
+两者都用 `TOOLS`（`get_current_time`）、都只用内存历史（`InMemorySaver`），不落盘；
+模块只提供构建函数，对话由测试脚本驱动。
 
 ## 实现差异
 
-**A. 纯 create_agent**：图、工具循环、内存历史全部由 `create_agent` 内部管理。
+**A. 纯 create_agent**：图、工具循环、系统提示、内存历史全由 `create_agent` 内部管理，一行搞定。
 
 ```python
 def build_agent(model):
@@ -21,15 +22,25 @@ def build_agent(model):
                         checkpointer=InMemorySaver())
 ```
 
-**B. create_agent + graph 编排**：把 A 的产物当成外层图的一个节点。
+**B. LangGraph 手工编排**：自己定义节点、条件边和工具节点。
 
 ```python
-def build_graph(model):
-    agent = create_agent(model, tools=TOOLS, system_prompt=SYSTEM_PROMPT)
+def build_graph(llm):
+    llm_with_tools = llm.bind_tools(TOOLS)
+
+    def chatbot(state: MessagesState) -> dict:
+        messages = [SystemMessage(content=SYSTEM_PROMPT), *state["messages"]]
+        return {"messages": [llm_with_tools.invoke(messages)]}
+
+    def should_continue(state: MessagesState):
+        return "tools" if state["messages"][-1].tool_calls else END
+
     builder = StateGraph(MessagesState)
-    builder.add_node("agent", agent)     # 编译好的 agent 直接当节点
-    builder.add_edge(START, "agent")
-    builder.add_edge("agent", END)
+    builder.add_node("chatbot", chatbot)
+    builder.add_node("tools", ToolNode(TOOLS))
+    builder.add_edge(START, "chatbot")
+    builder.add_conditional_edges("chatbot", should_continue, ["tools", END])
+    builder.add_edge("tools", "chatbot")
     return builder.compile(checkpointer=InMemorySaver())
 ```
 
@@ -37,11 +48,13 @@ B 的图结构：
 
 ```mermaid
 graph TD
-    Start([Start]) --> Agent[agent<br/>create_agent]
-    Agent --> END([END])
+    Start([Start]) --> Chatbot[chatbot<br/>llm.bind_tools]
+    Chatbot -- 有 tool_calls --> Tools[tools<br/>ToolNode]
+    Tools --> Chatbot
+    Chatbot -- 无 tool_calls --> END([END])
 ```
 
-`agent` 节点内部仍是标准 ReAct 循环（模型 → 工具 → 模型），由 `create_agent` 负责。
+A 内部其实是同一张图，只是由 `create_agent` 自动生成。
 
 ## 测试
 
@@ -51,7 +64,7 @@ graph TD
 uv run python tests/compare_chatbots.py
 ```
 
-执行方式：**串行**——A 先跑完全部 8 轮，B 再跑一遍；两者使用独立的 `thread_id`，互不影响。
+执行方式：**串行**——A 先跑完全部 8 轮，B 再跑一遍；两者使用独立 `thread_id`，互不影响。
 每轮记录：耗时、消息条数、本轮工具调用、校验结果。
 
 ### 语料（8 轮）
@@ -71,41 +84,39 @@ uv run python tests/compare_chatbots.py
 
 **逐轮耗时**（毫秒）
 
-| 轮次 | A 纯 create_agent | B graph 编排 | 差值 | 消息条数（两者相同） |
+| 轮次 | A 纯 create_agent | B LangGraph 编排 | 差值 | 消息条数（两者相同） |
 |---|---|---|---|---|
-| 1 | 253 | 236 | -16 | 2 |
-| 2 | 480 | 552 | +73 | 4 |
-| 3 | 691 | 675 | -16 | 8 |
-| 4 | 150 | 127 | -23 | 10 |
-| 5 | 211 | 219 | +9 | 12 |
-| 6 | 176 | 162 | -14 | 14 |
-| 7 | 218 | 256 | +38 | 16 |
-| 8 | 688 | 690 | +2 | 20 |
+| 1 | 261 | 227 | -35 | 2 |
+| 2 | 416 | 411 | -5 | 4 |
+| 3 | 627 | 624 | -3 | 8 |
+| 4 | 127 | 126 | -1 | 10 |
+| 5 | 187 | 218 | +32 | 12 |
+| 6 | 161 | 156 | -5 | 14 |
+| 7 | 308 | 305 | -3 | 16 |
+| 8 | 641 | 646 | +5 | 20 |
 
 **汇总**
 
 | 指标 | A | B |
 |---|---|---|
-| 总耗时 | 2.87s | 2.92s |
-| 平均每轮 | 358ms | 365ms |
-| 最快 / 最慢 | 150ms / 691ms | 127ms / 690ms |
+| 总耗时 | 2.73s | 2.71s |
+| 平均每轮 | 341ms | 339ms |
+| 最快 / 最慢 | 127ms / 641ms | 126ms / 646ms |
 | 校验通过 | 8/8 | 8/8 |
 
 **关键观察**
 
-- 两者消息条数逐轮完全相同（2, 4, 8, 10, 12, 14, 16, 20），说明图编排没有改变状态演进。
-- 第 3、8 轮都真实调用了 `get_current_time`，返回时间与系统时间一致。
-- 第 4~7 轮都正确回忆出第 1、2 轮的姓名/职业/语言，历史保持正常。
-- 总耗时差 53ms（1.8%），小于同一实现自身的轮次抖动，属于噪声。
-- 答案措辞并非逐字相同（完全一致 0/8），这是模型采样的随机性，不是编排差异：
-  两者校验均 8/8，语义一致。
+- 消息条数逐轮完全相同（2, 4, 8, 10, 12, 14, 16, 20），状态演进一致。
+- 第 3、8 轮都真实调用 `get_current_time`，返回时间与系统时间一致。
+- 第 4~7 轮都正确回忆第 1、2 轮的姓名/职业/语言。
+- 总耗时差 14ms（0.5%），小于同一实现自身的轮次抖动，属噪声。
+- 答案措辞并非逐字相同（完全一致 3/8），这是采样随机性：两者校验均 8/8，语义一致。
 
 ## 结论
 
 1. **功能完全等价**：消息条数、工具调用、事实回忆、校验结果逐轮一致。
-2. **耗时无实质差异**：2.87s vs 2.92s，差值在噪声范围内。
-3. **成本几乎为零**：B 只比 A 多一层单节点包装，没有额外模型调用。
-4. **收益在可编排性**：A 要插入检索、改写、审核得改中间件或内部行为；
-   B 直接在图上加节点和边即可，例如 `START -> rewrite -> agent -> check -> END`。
-
-因此：**只做纯对话选 A；预判后续要编排选 B，现在不额外付出代价。**
+2. **耗时无差异**：2.73s vs 2.71s，波动在噪声范围内。
+3. **主要差别是代码量与可控性**：
+   - A 一行 `create_agent`，但想改内部行为（加中间件、改循环）得看它的约定；
+   - B 约 20 行显式搭图，每个节点、边、提示词位置都自己掌控，插入检索/改写/审核节点直接加即可。
+4. **选择建议**：只做纯对话选 A；需要精确控制流程或后续要加环节选 B。
