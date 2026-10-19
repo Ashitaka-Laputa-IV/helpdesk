@@ -47,17 +47,24 @@ RRF_K = 20  # 平滑常数，扫描中 20 优于常用的 60
 TOP_N = 8  # 融合后进入上下文的条数
 
 
-def rrf_rank(bm25_docs: list[dict], semantic_docs: list[dict], top_n: int) -> list[dict]:
+def rrf_rank(
+    bm25_docs: list[dict],
+    semantic_docs: list[dict],
+    top_n: int,
+    rrf_k: int = RRF_K,
+) -> list[dict]:
     """按名次倒数融合两路召回，返回 top_n。
 
     只依赖排名、不依赖分数量纲，因此 bm25 的概率分与向量的余弦分可以直接混用。
+    rrf_k 越大，靠后名次的衰减越平缓；分数相同时保持首次出现的先后（bm25 在前），
+    因为 sorted 是稳定排序。
     """
     scores: dict[tuple[str, str], float] = {}
     docs: dict[tuple[str, str], dict] = {}
     for ranked in (bm25_docs, semantic_docs):
         for rank, doc in enumerate(ranked, 1):
             key = (doc["source"], doc["text"])
-            scores[key] = scores.get(key, 0.0) + 1.0 / (RRF_K + rank)
+            scores[key] = scores.get(key, 0.0) + 1.0 / (rrf_k + rank)
             docs[key] = doc
     ordered = sorted(scores.items(), key=lambda item: -item[1])[:top_n]
     return [docs[key] for key, _ in ordered]
