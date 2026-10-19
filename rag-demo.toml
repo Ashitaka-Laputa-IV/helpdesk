@@ -1,0 +1,103 @@
+# RAG Demo 全部可调参数。代码里不出现任何字面量配置。
+
+[chat]
+name = "openai:qwen3-4b-instruct"
+base_url = "http://127.0.0.1:9938/v1"
+api_key = "not-needed"
+temperature = 0.0
+max_tokens = -1          # -1 表示不限制
+
+[router]
+name = "openai:qwen3-4b-instruct"
+base_url = "http://127.0.0.1:9938/v1"
+api_key = "not-needed"
+temperature = 0.0
+max_tokens = 256             # 太小会在结构化输出时被截断
+
+[embedding]
+name = "bge-m3"
+base_url = "http://127.0.0.1:9931/v1"
+api_key = "not-needed"
+check_ctx_length = false  # llama.cpp 不认 tiktoken 的 token id 输入，必须关掉
+
+[reranker]
+name = "llama_server:bge-reranker"
+base_url = "http://127.0.0.1:9932"
+
+[retrieval]
+docs_dir = "data/langchain-docs"
+docs_glob = "**/*.md"
+index_dir = ".chroma"          # 复用项目已有索引；换目录会在首次运行时重建（较慢）
+collection = "helpdesk"
+chunk_size = 1000
+chunk_overlap = 200
+index_batch_size = 1000
+bm25_k = 25
+semantic_k = 15
+rrf_k = 20
+top_n = 8
+ranking = "rrf"                # rrf | rerank | none
+router_mode = "llm"            # llm | always
+
+[runtime]
+thread_id = "rag-demo"
+
+[memory]
+trigger_tokens = 1500
+keep_messages = 6
+
+[prompts]
+router = """你是检索路由器，只做分类，不要回答问题。
+
+按顺序判断最后一条用户消息，命中即停：
+
+第一步：它是寒暄、致谢、闲聊吗（Hello、Thanks、再见之类）？→ false
+第二步：它是在问对话历史本身吗（比如「我刚才问了什么」）？→ false
+第三步：对话历史里已经有这个问题的答案吗（包括用户把同一句话又问一遍）？→ false
+第四步：它是在问 LangChain / LangGraph 的技术细节吗（概念、API、类名、参数、配置、用法、流程）？→ true
+
+只有第四步命中才返回 true，其余一律 false。完全无法判断时返回 true。
+
+示例：
+"Hello" → false
+"Thanks" → false
+"What did I just ask?" → false
+"How do I define a tool in LangChain?"（历史中已答过）→ false
+"How do I define a tool in LangChain?"（历史中没有）→ true
+"What is the basic flow of vector store retrieval?" → true
+"""
+
+summarize = """把下面的对话压缩成一段摘要，供后续对话参考。
+
+要求：
+- 保留用户问过的问题，以及答案里的关键结论、具体名称、参数、数字
+- 保留「某个问题已经回答过」这一事实
+- 去掉寒暄、重复提问的冗余内容和无关细节
+- 用中文陈述，不超过 300 字
+- 只输出摘要正文，不要额外说明
+
+[已有摘要]
+{previous}
+
+[新增对话]
+{dialogue}
+"""
+
+answer = """你是 LangChain / LangGraph 技术客服。请仅依据下方「资料」回答用户问题。
+
+要求：
+- 只使用资料中的信息，不要补充资料之外的内容
+- 资料不足以回答时，直接说明「资料中没有提到」，不要猜测
+- 用与用户提问相同的语言回答，简洁准确，必要时给出代码片段
+- 回答末尾标注引用的来源文件名
+
+[资料]
+{context}
+"""
+
+plain = """你是 LangChain / LangGraph 技术客服。本次没有检索资料，请直接回答用户问题。
+
+要求：
+- 用与用户提问相同的语言回答，简洁准确
+- 不确定的地方明确说明，不要编造
+"""
