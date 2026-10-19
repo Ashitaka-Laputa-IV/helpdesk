@@ -82,6 +82,11 @@ def build_graph(
       - "rrf"（默认）：按名次倒数融合
       - "none"：沿用召回顺序（bm25 在前、向量补位）
       - "rerank"：用传入的 reranker 重新打分
+
+    router_mode 决定要不要检索：
+      - "rule"：寒暄不检索，其余检索
+      - "llm"：交给模型判断
+      - "always"：一律检索（用于对比"无判断"方案）
     """
     structured_router = router_model.with_structured_output(RouteDecision)
 
@@ -93,7 +98,10 @@ def build_graph(
     def router(state: ChatState) -> dict:
         question = state["messages"][-1].text
         started = time.perf_counter()
-        if router_mode == "llm" and not SMALL_TALK.match(question):
+        if router_mode == "always":
+            # 不判断，一律检索：用于与"有判断"方案做对比
+            search_needed = True
+        elif router_mode == "llm" and not SMALL_TALK.match(question):
             search_needed = needs_retrieval(structured_router, state["messages"])
         else:
             search_needed = rule_needs_retrieval(question)
