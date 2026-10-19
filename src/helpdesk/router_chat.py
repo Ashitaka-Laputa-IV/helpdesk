@@ -7,20 +7,20 @@
          chatbot -> END
 
 Router 支持两种模式（ROUTER_MODE）：
-  - rule（默认）：0ms 规则，寒暄/致谢判「不检索」，其余默认「检索」。
-    实测当前 2.6B 模型关掉思考后无法做这个判断（一律答 n），开思考又要 1.5~3s，故默认走规则。
-  - llm：用 with_structured_output 让模型直接返回目标节点名（retrieve / chatbot），
+  - llm（默认）：用 with_structured_output 让模型直接返回目标节点名（retrieve / chatbot），
     省掉文本解析；temperature=0，直接把 state["messages"] 当对话输入（模型能看到完整轮次），
     历史已能回答的问题不再检索；异常时保守地默认「检索」。
     依赖 summarize 节点先把历史压缩——历史很长时对话形态会把模型带跑（顺着对话作答而不是分类）。
     配 ROUTER_MODEL / ROUTER_BASE_URL 指向非思考小模型。
+  - always：一律检索，不做判断（兜底或对比用）。
+
+注：寒暄/致谢不再用正则特判，统一交给上面这条判断链路。
 
 用法:
     uv run python src/helpdesk/router_chat.py
 """
 
 import os
-import re
 import time
 import warnings
 from pathlib import Path
@@ -58,13 +58,6 @@ ROUTER_PROMPT = (
     "无法确定时选 retrieve。"
 )
 
-# 0ms 快路径：纯寒暄/确认显然不需要查库，直接跳过 LLM 路由
-SMALL_TALK = re.compile(
-    r"^\s*(你好|您好|hi|hello|hey|谢谢|感谢|多谢|thanks|thank you|ok|okay|好的|收到|再见|bye)"
-    r"[\s!！。.？?]*$",
-    re.IGNORECASE,
-)
-
 SYSTEM_PROMPT = "你是客服助手，只依据给定资料回答问题；资料中没有的信息，直接说明不知道。"
 PLAIN_PROMPT = "你是客服助手，请直接、简洁地回答用户。"
 
@@ -97,11 +90,6 @@ def silence_serializer_warning() -> None:
     warnings.filterwarnings("ignore", message="Pydantic serializer warnings")
 
 
-def rule_needs_retrieval(question: str) -> bool:
-    """0ms 规则判定：寒暄/致谢不需要查库，其余默认检索（宁可多查）。"""
-    return not SMALL_TALK.match(question)
-
-
 def needs_retrieval(structured_router, messages) -> bool:
     """LLM 路由：直接把对话轮次作为输入，规则放在 system 里。
 
@@ -125,7 +113,7 @@ def build_graph(
     retriever,
     reranker,
     checkpointer=None,
-    router_mode: str = "rule",
+    router_mode: str = "llm",
 ):
     """构建并编译 chat 图。"""
     # 结构化输出：模型直接返回目标节点名
@@ -138,13 +126,12 @@ def build_graph(
 
     def router(state: ChatState) -> dict:
         messages = state["messages"]
-        question = messages[-1].text
         started = time.perf_counter()
-        # 寒暄/致谢走 0ms 快路径（两种模式都适用），其余才交给 LLM 判断
-        if router_mode == "llm" and not SMALL_TALK.match(question):
+        # 不区分问题类型：llm 模式全部交给模型判断，always 模式一律检索
+        if router_mode == "llm":
             search_needed = needs_retrieval(structured_router, messages)
         else:
-            search_needed = rule_needs_retrieval(question)
+            search_needed = True
         cost = time.perf_counter() - started
         print(
             f"[router] {'检索' if search_needed else '不检索'}"
@@ -255,7 +242,7 @@ def main() -> None:
         temperature=0,
         max_tokens=ROUTER_MAX_TOKENS,
     )
-    router_mode = os.environ.get("ROUTER_MODE", "rule")
+    router_mode = os.environ.get("ROUTER_MODE", "llm")
     config = thread_config(DEFAULT_USER, DEFAULT_THREAD)
 
     with SqliteSaver.from_conn_string(str(DB_PATH)) as checkpointer:

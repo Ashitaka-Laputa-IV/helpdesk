@@ -31,12 +31,10 @@ from helpdesk.bm25 import build_index, load_chunks, search
 from helpdesk.rag import COLLECTION, INDEX_DIR
 from helpdesk.router_chat import (
     PLAIN_PROMPT,
-    SMALL_TALK,
     SYSTEM_PROMPT,
     ChatState,
     RouteDecision,
     needs_retrieval,
-    rule_needs_retrieval,
 )
 from helpdesk.summarize import compress_history
 
@@ -71,7 +69,7 @@ def build_graph(
     chunks,
     retriever,
     checkpointer=None,
-    router_mode: str = "rule",
+    router_mode: str = "llm",
     top_n: int = TOP_N,
     ranking: str = "rrf",
     reranker=None,
@@ -84,8 +82,7 @@ def build_graph(
       - "rerank"：用传入的 reranker 重新打分
 
     router_mode 决定要不要检索：
-      - "rule"：寒暄不检索，其余检索
-      - "llm"：交给模型判断
+      - "llm"（默认）：交给模型判断，寒暄与业务问题一视同仁
       - "always"：一律检索（用于对比"无判断"方案）
     """
     structured_router = router_model.with_structured_output(RouteDecision)
@@ -96,15 +93,12 @@ def build_graph(
         return {"messages": updates} if updates else {}
 
     def router(state: ChatState) -> dict:
-        question = state["messages"][-1].text
         started = time.perf_counter()
-        if router_mode == "always":
-            # 不判断，一律检索：用于与"有判断"方案做对比
-            search_needed = True
-        elif router_mode == "llm" and not SMALL_TALK.match(question):
+        # 不区分问题类型：llm 模式全部交给模型判断，always 模式一律检索
+        if router_mode == "llm":
             search_needed = needs_retrieval(structured_router, state["messages"])
         else:
-            search_needed = rule_needs_retrieval(question)
+            search_needed = True
         cost = time.perf_counter() - started
         print(
             f"[router] {'检索' if search_needed else '不检索'}"
@@ -219,7 +213,7 @@ def main() -> None:
             chunks,
             retriever,
             checkpointer,
-            os.environ.get("ROUTER_MODE", "rule"),
+            os.environ.get("ROUTER_MODE", "llm"),
         )
 
         print("输入问题开始问答，输入 exit / quit 结束。")
