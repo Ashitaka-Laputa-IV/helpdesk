@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import tomllib
 import uuid
+import warnings
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterator, Literal
@@ -447,7 +448,13 @@ class RagDemo:
                 yield message.text
 
 
+def silence_serializer_warnings() -> None:
+    """流式输出 + with_structured_output 时，parsed 字段会触发 Pydantic 序列化告警。"""
+    warnings.filterwarnings("ignore", message="Pydantic serializer warnings")
+
+
 def main() -> None:
+    silence_serializer_warnings()
     parser = argparse.ArgumentParser(description="RAG Demo")
     parser.add_argument("--config", default="rag-demo.toml", help="配置文件路径")
     parser.add_argument("--ranking", choices=["rrf", "rerank", "none"], help="覆盖排序策略")
