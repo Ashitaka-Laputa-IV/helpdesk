@@ -81,15 +81,17 @@ def build_summary_message(summary: str) -> HumanMessage:
     )
 
 
-def summarize_if_needed(model, messages) -> tuple[str, list]:
-    """超出预算时把较早的消息压成摘要。
+def should_summarize(messages) -> bool:
+    """历史是否已超出 token 预算。"""
+    return count_tokens(messages) > TRIGGER_TOKENS
 
-    返回 (摘要文本, 需要保留的消息列表)。未触发或失败时返回 ("", [])，
-    这样压缩失败也不会丢历史。
+
+def compress(model, messages) -> tuple[str, list]:
+    """把较早的消息压成摘要，返回 (摘要文本, 需要保留的消息列表)。
+
+    只负责压缩本身：不做预算判断，也不吞异常（由 summarize_if_needed 兜底）。
+    切不出可压缩的部分时返回 ("", [])。
     """
-    if count_tokens(messages) <= TRIGGER_TOKENS:
-        return "", []
-
     summaries, plain = split_history(messages)
     cut = safe_cutoff(plain, KEEP_MESSAGES)
     if cut <= 0:
@@ -103,10 +105,7 @@ def summarize_if_needed(model, messages) -> tuple[str, list]:
     prompt = SUMMARY_PROMPT.format(
         summary=previous or "（无）", dialogue=format_dialogue(old)
     )
-    try:
-        reply = model.invoke(prompt)
-    except Exception:  # noqa: BLE001 - 压缩失败不应阻塞对话
-        return "", []
+    reply = model.invoke(prompt)
     new_summary = (getattr(reply, "text", "") or "").strip()
     if not new_summary:
         return "", []
@@ -116,6 +115,20 @@ def summarize_if_needed(model, messages) -> tuple[str, list]:
         f"保留 {len(remaining)} 条"
     )
     return new_summary, remaining
+
+
+def summarize_if_needed(model, messages) -> tuple[str, list]:
+    """需要时压缩：先判断预算，再调用 compress，失败不阻塞对话。
+
+    返回 (摘要文本, 需要保留的消息列表)。未触发或失败时返回 ("", [])，
+    这样压缩失败也不会丢历史。
+    """
+    if not should_summarize(messages):
+        return "", []
+    try:
+        return compress(model, messages)
+    except Exception:  # noqa: BLE001 - 压缩失败不应阻塞对话
+        return "", []
 
 
 def compress_history(model, messages) -> list | None:
