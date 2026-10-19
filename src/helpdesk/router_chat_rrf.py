@@ -35,6 +35,7 @@ from helpdesk.router_chat import (
     ChatState,
     RouteDecision,
     needs_retrieval,
+    silence_serializer_warning,
 )
 from helpdesk.summarize import compress_history
 
@@ -178,6 +179,8 @@ def build_graph(
 
 def main() -> None:
     silence_beta_warning()
+    # 流式下 with_structured_output 的 parsed 字段会被序列化，发出 Pydantic 告警
+    silence_serializer_warning()
     load_dotenv()
 
     chunks = load_chunks()
@@ -225,10 +228,21 @@ def main() -> None:
             if question.strip().lower() in {"exit", "quit"}:
                 break
 
-            result = graph.invoke(
-                {"messages": [HumanMessage(content=question)]}, config
-            )
-            print(f"A: {result['messages'][-1].text}")
+            # 流式输出：只打印 chatbot 节点吐出的 token，边生成边显示。
+            # "A: " 延迟到首个 token 再打印，否则会被 router 的日志插在中间。
+            started = False
+            for message, metadata in graph.stream(
+                {"messages": [HumanMessage(content=question)]},
+                config,
+                stream_mode="messages",
+            ):
+                if metadata.get("langgraph_node") != "chatbot" or not message.text:
+                    continue
+                if not started:
+                    print("A: ", end="", flush=True)
+                    started = True
+                print(message.text, end="", flush=True)
+            print()
 
 
 if __name__ == "__main__":
