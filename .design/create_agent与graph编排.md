@@ -9,8 +9,12 @@
 | **A** | 纯 `create_agent` | `chat.agent_chat.build_agent(model)` |
 | **B** | 用 `llm = init_chat_model(...)` 手工搭 LangGraph | `chat.langgraph_chat.build_graph(model, InMemorySaver(), SYSTEM_PROMPT)` |
 
-两者都用 `TOOLS`（`get_current_time`）、都只用内存历史（`InMemorySaver`），不落盘；
-模块只提供构建函数，对话由测试脚本驱动。
+两者都用 `TOOLS`（`get_current_time`）。对比测试里都用内存历史（`InMemorySaver`），不落盘；
+`agent_chat` 另外提供 `main()`，命令行运行时用 `SqliteSaver` 落盘到 `.agent_chat.db`：
+
+```bash
+uv run python -m taste_rag.chat.agent_chat
+```
 
 ## 实现差异
 
