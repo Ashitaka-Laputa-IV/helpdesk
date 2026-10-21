@@ -13,9 +13,10 @@ import time
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage
+from langgraph.checkpoint.memory import InMemorySaver
 
-from taste_rag.chat.manual_graph import build_graph
-from taste_rag.chat.create_agent import build_agent
+from taste_rag.chat.agent_chat import SYSTEM_PROMPT, build_agent
+from taste_rag.chat.langgraph_chat import build_graph
 
 # 8 轮语料：自我介绍 -> 稳定事实 -> 工具 -> 反复回忆 -> 归纳
 CORPUS = [
@@ -129,7 +130,7 @@ def main() -> None:
 
     # 串行：A 跑完再跑 B，两个实现各自使用独立的 thread_id
     rows_a = run("A", build_agent(model), "cmp-a")
-    rows_b = run("B", build_graph(model), "cmp-b")
+    rows_b = run("B", build_graph(model, InMemorySaver(), SYSTEM_PROMPT), "cmp-b")
 
     report("A. 纯 create_agent", rows_a)
     report("B. LangGraph 手工编排", rows_b)

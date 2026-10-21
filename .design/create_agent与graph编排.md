@@ -6,8 +6,8 @@
 
 | | 实现 | 构建函数 |
 |---|---|---|
-| **A** | 纯 `create_agent` | `chat_create_agent.build_agent(model)` |
-| **B** | 用 `llm = init_chat_model(...)` 手工搭 LangGraph | `chat_manual_graph.build_graph(llm)` |
+| **A** | 纯 `create_agent` | `chat.agent_chat.build_agent(model)` |
+| **B** | 用 `llm = init_chat_model(...)` 手工搭 LangGraph | `chat.langgraph_chat.build_graph(model, InMemorySaver(), SYSTEM_PROMPT)` |
 
 两者都用 `TOOLS`（`get_current_time`）、都只用内存历史（`InMemorySaver`），不落盘；
 模块只提供构建函数，对话由测试脚本驱动。
@@ -25,12 +25,14 @@ def build_agent(model):
 **B. LangGraph 手工编排**：自己定义节点、条件边和工具节点。
 
 ```python
-def build_graph(llm):
-    llm_with_tools = llm.bind_tools(TOOLS)
+def build_graph(model, checkpointer=None, system_prompt=None):
+    model_with_tools = model.bind_tools(TOOLS)
 
     def chatbot(state: MessagesState) -> dict:
-        messages = [SystemMessage(content=SYSTEM_PROMPT), *state["messages"]]
-        return {"messages": [llm_with_tools.invoke(messages)]}
+        messages = state["messages"]
+        if system_prompt:
+            messages = [SystemMessage(content=system_prompt), *messages]
+        return {"messages": [model_with_tools.invoke(messages)]}
 
     def should_continue(state: MessagesState):
         return "tools" if state["messages"][-1].tool_calls else END
@@ -41,8 +43,10 @@ def build_graph(llm):
     builder.add_edge(START, "chatbot")
     builder.add_conditional_edges("chatbot", should_continue, ["tools", END])
     builder.add_edge("tools", "chatbot")
-    return builder.compile(checkpointer=InMemorySaver())
+    return builder.compile(checkpointer=checkpointer)
 ```
+
+对比测试里 B 使用内存历史并补上人设：`build_graph(llm, InMemorySaver(), SYSTEM_PROMPT)`。
 
 B 的图结构：
 

@@ -2,7 +2,7 @@
 
 目录结构：
     core/   检索与运行时基础设施（语料、索引、召回、压缩、会话、工具、依赖装配）
-    chat/   基础多轮 chat 与两个对照实现
+    chat/   基础多轮 chat（LangGraph 版 / create_agent 版）
     rag/    各类 RAG 实现与共用节点
     api/    FastAPI 服务与命令行客户端
 
@@ -10,7 +10,7 @@
 具体实现按子包导入，例如 `from taste_rag.rag.router import build_graph`。
 """
 
-from taste_rag.chat.basic import DB_PATH, build_graph, main
+from taste_rag.chat.langgraph_chat import DB_PATH, build_graph, main
 from taste_rag.core.runtime import load_model, silence_beta_warning
 from taste_rag.core.session import (
     DEFAULT_THREAD,
