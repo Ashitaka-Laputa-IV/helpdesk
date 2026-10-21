@@ -2,7 +2,7 @@
 
 ## 1. 目的
 
-新版 `router_chat_rrf.py` 用 RRF 替代 reranker，但初版参数是照搬重排版的
+新版 `rag_router_rrf.py` 用 RRF 替代 reranker，但初版参数是照搬重排版的
 （`bm25_k=10 / sem_k=15 / rrf_k=60 / top_n=5`）。两条链路的代价结构不同，
 参数不应相同。本报告扫描参数空间，给出各自的最优配置。
 
@@ -91,11 +91,11 @@ rerank 耗时第二遍为 816ms / 1055ms（首轮 788ms / 1007ms），波动约 
 
 | 文件 | 参数 | 原值 | 新值 |
 |---|---|---|---|
-| `router_chat_rrf.py` | `BM25_K` | 10 | **25** |
-| `router_chat_rrf.py` | `SEMANTIC_K` | 复用 router_chat | **15（独立定义）** |
-| `router_chat_rrf.py` | `RRF_K` | 60 | **20** |
-| `router_chat_rrf.py` | `TOP_N` | 5 | **8** |
-| `router_chat.py` | `TOP_K` | 5 | **8** |
+| `rag_router_rrf.py` | `BM25_K` | 10 | **25** |
+| `rag_router_rrf.py` | `SEMANTIC_K` | 复用 rag_router_rerank | **15（独立定义）** |
+| `rag_router_rrf.py` | `RRF_K` | 60 | **20** |
+| `rag_router_rrf.py` | `TOP_N` | 5 | **8** |
+| `rag_router_rerank.py` | `TOP_K` | 5 | **8** |
 
 `SEMANTIC_K` 定为 15（扫描显示加深到 25 会拉低 MRR）。
 

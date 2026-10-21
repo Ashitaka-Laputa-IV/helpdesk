@@ -1,117 +1,46 @@
-"""最简 chat 图 + 工具调用：使用 langgraph + langchain。
+"""taste-rag：LangChain / LangGraph 的 RAG 实验集。
 
-图结构：START -> chatbot -> (tools -> chatbot)* -> END
-chatbot 节点调用模型；当模型请求调用工具时，先由 tools 节点执行，再回到 chatbot。
-对话历史通过 SqliteSaver checkpointer 持久化到 .chat.db，并按 (user_id, thread_id) 隔离。
+模块分层：
+    corpus                     语料目录与切块
+    bm25 / vector_store        稀疏索引、向量库
+    chat                       基础多轮 chat（含 CLI、持久化历史）
+    chat_create_agent          对照：纯 create_agent 版 chat
+    chat_manual_graph          对照：手工 StateGraph 版 chat
+    rag_basic                  最简 2-step RAG
+    rag_bm25_rerank            多查询改写 + bm25 + 重排
+    rag_router_rerank          Router + 双路召回 + 重排（主实现）
+    rag_router_rrf             Router + 双路召回 + RRF
+    rag_agent                  Agentic RAG（create_agent + 检索工具）
+    summarize                  上下文压缩
+    app / client               FastAPI 服务与 HTTP 客户端
+
+这里只做公共导出，方便 `from taste_rag import thread_config` 之类的调用。
 """
 
-import argparse
-import os
-import warnings
-from datetime import datetime
-from pathlib import Path
-from typing import Literal
+from taste_rag.chat import (
+    DB_PATH,
+    DEFAULT_THREAD,
+    DEFAULT_USER,
+    TOOLS,
+    build_graph,
+    get_current_time,
+    load_model,
+    main,
+    silence_beta_warning,
+    thread_config,
+    thread_key,
+)
 
-from dotenv import load_dotenv
-from langchain.chat_models import init_chat_model
-from langchain.messages import HumanMessage
-from langchain.tools import tool
-from langchain_core._api import LangChainBetaWarning
-from langgraph.checkpoint.sqlite import SqliteSaver
-from langgraph.graph import END, START, MessagesState, StateGraph
-from langgraph.prebuilt import ToolNode
-
-DB_PATH = Path(__file__).resolve().parents[2] / ".chat.db"
-DEFAULT_USER = "default"
-DEFAULT_THREAD = "default"
-
-
-def thread_key(user_id: str, thread_id: str) -> str:
-    """拼出 checkpointer 的 thread_id，保证不同用户/会话互不串线。"""
-    return f"{user_id}:{thread_id}"
-
-
-def thread_config(user_id: str, thread_id: str) -> dict:
-    """构造传给图的 config。"""
-    return {"configurable": {"thread_id": thread_key(user_id, thread_id)}}
-
-
-def silence_beta_warning() -> None:
-    """v3 流式协议目前是实验性的，屏蔽其 beta 警告避免污染输出。"""
-    warnings.filterwarnings("ignore", category=LangChainBetaWarning)
-
-
-@tool
-def get_current_time() -> str:
-    """获取当前的日期与时间。"""
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-
-TOOLS = [get_current_time]
-
-
-def load_model():
-    """从环境变量初始化对话模型。"""
-    load_dotenv()
-    return init_chat_model(os.environ["MODEL"])
-
-
-def build_graph(model, checkpointer=None):
-    """构建并编译 chat 图。"""
-    model_with_tools = model.bind_tools(TOOLS)
-
-    def chatbot(state: MessagesState) -> dict:
-        return {"messages": [model_with_tools.invoke(state["messages"])]}
-
-    def should_continue(state: MessagesState) -> Literal["tools", END]:
-        if state["messages"][-1].tool_calls:
-            return "tools"
-        return END
-
-    builder = StateGraph(MessagesState)
-    builder.add_node("chatbot", chatbot)
-    builder.add_node("tools", ToolNode(TOOLS))
-    builder.add_edge(START, "chatbot")
-    builder.add_conditional_edges("chatbot", should_continue, ["tools", END])
-    builder.add_edge("tools", "chatbot")
-    return builder.compile(checkpointer=checkpointer)
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="命令行 chat")
-    parser.add_argument("--user", default=DEFAULT_USER, help="用户标识")
-    parser.add_argument("--thread", default=DEFAULT_THREAD, help="会话标识")
-    args = parser.parse_args()
-
-    silence_beta_warning()
-    model = load_model()
-    config = thread_config(args.user, args.thread)
-
-    # 历史存 .chat.db，按 (user, thread) 隔离；只传新消息，LangGraph 自动接上历史
-    with SqliteSaver.from_conn_string(str(DB_PATH)) as checkpointer:
-        graph = build_graph(model, checkpointer)
-        print(f"[{args.user}/{args.thread}] 输入内容开始对话，输入 exit / quit 结束。")
-        while True:
-            try:
-                user_input = input("You: ")
-            except (EOFError, KeyboardInterrupt):
-                break
-            if user_input.strip().lower() in {"exit", "quit"}:
-                break
-
-            print("AI: ", end="", flush=True)
-            stream = graph.stream_events(
-                {"messages": [HumanMessage(content=user_input)]},
-                config,
-                version="v3",
-            )
-            # 投影消费：messages 投影按节点给出逐 token 文本
-            for _, item in stream.interleave("messages"):
-                if item.node == "chatbot":
-                    for token in item.text:
-                        print(token, end="", flush=True)
-            print()
-
-
-if __name__ == '__main__':
-    main()
+__all__ = [
+    "DB_PATH",
+    "DEFAULT_THREAD",
+    "DEFAULT_USER",
+    "TOOLS",
+    "build_graph",
+    "get_current_time",
+    "load_model",
+    "main",
+    "silence_beta_warning",
+    "thread_config",
+    "thread_key",
+]

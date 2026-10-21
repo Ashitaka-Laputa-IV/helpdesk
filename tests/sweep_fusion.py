@@ -23,8 +23,9 @@ from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 
-from taste_rag.bm25 import build_index, load_chunks, search
-from taste_rag.rag import COLLECTION, INDEX_DIR
+from taste_rag.bm25 import build_index, search
+from taste_rag.corpus import load_chunks
+from taste_rag.vector_store import COLLECTION, INDEX_DIR
 
 POOL_K = 30  # 一次召回的深度，需覆盖所有配置里最大的 k
 EVAL_PATH = Path(__file__).resolve().parents[1] / "data" / "eval" / "queries.json"

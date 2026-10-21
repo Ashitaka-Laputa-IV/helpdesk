@@ -81,7 +81,7 @@
 
 | | 实现 | 入口 |
 |---|---|---|
-| **A** | 固定编排（router → 并行召回 → 重排 → 生成） | `router_chat.build_graph` |
+| **A** | 固定编排（router → 并行召回 → 重排 → 生成） | `rag_router_rerank.build_graph` |
 | **B** | Agentic（`create_agent` + 检索工具，模型自主决定） | `rag_agent.build_agent` |
 
 串行执行：A 跑完 6 轮，B 再跑一遍，各自独立 `thread_id` 与内存 checkpointer。

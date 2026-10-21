@@ -1,6 +1,6 @@
 """LangGraph 手工编排版多轮 chatbot（内存历史，不落盘）。
 
-和 agentic_chat.py 的区别：那边一行 create_agent 全包，这边用 init_chat_model
+和 chat_create_agent.py 的区别：那边一行 create_agent 全包，这边用 init_chat_model
 拿到的 llm 自己搭 ReAct 循环：
 
     START -> chatbot ->(有 tool_calls)-> tools -> chatbot -> END
@@ -13,8 +13,8 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from taste_rag import TOOLS
-from taste_rag.agentic_chat import SYSTEM_PROMPT
+from taste_rag.chat import TOOLS
+from taste_rag.chat_create_agent import SYSTEM_PROMPT
 
 
 def build_graph(llm):

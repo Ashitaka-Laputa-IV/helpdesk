@@ -32,10 +32,11 @@ from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 
-from taste_rag.bm25 import build_index, load_chunks, search
-from taste_rag.rag import COLLECTION, DOCS_DIR, INDEX_DIR
+from taste_rag.bm25 import build_index, search
+from taste_rag.corpus import DOCS_DIR, load_chunks
+from taste_rag.vector_store import COLLECTION, INDEX_DIR
 from taste_rag.rag_agent import BM25_K, TOP_K
-from taste_rag.router_chat import SEMANTIC_K
+from taste_rag.rag_router_rerank import SEMANTIC_K
 
 SEED = 42
 
@@ -167,7 +168,7 @@ def main() -> None:
             stats["vector"]["time"].append((time.perf_counter() - started) * 1000)
             vector_sources = [doc.metadata["source"] for doc in vector_docs]
 
-            # 去重合并（与 rag_agent / router_chat 的候选池口径一致）
+            # 去重合并（与 rag_agent / rag_router_rerank 的候选池口径一致）
             candidates, seen = [], set()
             for _, source, text in hits:
                 key = (source, text)

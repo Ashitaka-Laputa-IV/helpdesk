@@ -19,7 +19,7 @@ from langchain.messages import HumanMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 from pydantic import BaseModel
 
-from taste_rag import (
+from taste_rag.chat import (
     DB_PATH,
     build_graph,
     load_model,

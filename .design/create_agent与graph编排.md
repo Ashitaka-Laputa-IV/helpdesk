@@ -6,8 +6,8 @@
 
 | | 实现 | 构建函数 |
 |---|---|---|
-| **A** | 纯 `create_agent` | `agentic_chat.build_agent(model)` |
-| **B** | 用 `llm = init_chat_model(...)` 手工搭 LangGraph | `agent_graph.build_graph(llm)` |
+| **A** | 纯 `create_agent` | `chat_create_agent.build_agent(model)` |
+| **B** | 用 `llm = init_chat_model(...)` 手工搭 LangGraph | `chat_manual_graph.build_graph(llm)` |
 
 两者都用 `TOOLS`（`get_current_time`）、都只用内存历史（`InMemorySaver`），不落盘；
 模块只提供构建函数，对话由测试脚本驱动。

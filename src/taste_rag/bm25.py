@@ -1,6 +1,6 @@
-"""BM25 关键词搜索 demo（独立，不依赖 langchain）。
+"""bm25s 稀疏检索：建索引与查询。
 
-对 data/langchain-docs 下的 markdown 做稀疏(词频)检索，只用 bm25s + 标准库。
+语料读取与切块在 corpus.py，本模块只负责索引本身。
 
 用法:
     uv run python src/taste_rag/bm25.py "how to define a tool"
@@ -8,28 +8,12 @@
 """
 
 import argparse
-from pathlib import Path
 
 import bm25s
 
-DOCS_DIR = Path(__file__).resolve().parents[2] / "data" / "langchain-docs"
-CHUNK_SIZE = 1000
-CHUNK_OVERLAP = 200
+from taste_rag.corpus import DOCS_DIR, load_chunks
+
 TOP_K = 5
-
-
-def load_chunks(docs_dir: Path = DOCS_DIR) -> list[tuple[str, str]]:
-    """读 markdown，按固定窗口简单切块，返回 [(来源, 文本)]。"""
-    chunks: list[tuple[str, str]] = []
-    step = CHUNK_SIZE - CHUNK_OVERLAP
-    for path in sorted(docs_dir.rglob("*.md")):
-        text = path.read_text(encoding="utf-8")
-        source = str(path.relative_to(docs_dir))
-        for start in range(0, len(text), step):
-            piece = text[start : start + CHUNK_SIZE].strip()
-            if piece:
-                chunks.append((source, piece))
-    return chunks
 
 
 def build_index(chunks: list[tuple[str, str]]):

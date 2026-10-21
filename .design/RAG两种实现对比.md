@@ -6,7 +6,7 @@
 
 | | 流程控制 | 构建函数 |
 |---|---|---|
-| **A** | 固定编排，router 节点决定是否检索 | `router_chat.build_graph(...)` |
+| **A** | 固定编排，router 节点决定是否检索 | `rag_router_rerank.build_graph(...)` |
 | **B** | `create_agent` + 检索工具，模型自主决定 | `rag_agent.build_agent(...)` |
 
 两者的检索链路完全一致：**bm25(10) + 语义(15) 去重 → rerank 取前 5**。
@@ -14,7 +14,7 @@
 
 ## 实现差异
 
-### A. 固定编排（`src/taste_rag/router_chat.py`）
+### A. 固定编排（`src/taste_rag/rag_router_rerank.py`）
 
 ```mermaid
 graph TD

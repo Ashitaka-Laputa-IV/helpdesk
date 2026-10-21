@@ -10,7 +10,7 @@
 用名次倒数融合（Reciprocal Rank Fusion）挑 topN，省掉 rerank 的数百毫秒开销。
 
 用法:
-    uv run python src/taste_rag/router_chat_rrf.py
+    uv run python src/taste_rag/rag_router_rrf.py
 """
 
 import os
@@ -26,10 +26,11 @@ from langchain_openai import OpenAIEmbeddings
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 
-from taste_rag import DEFAULT_THREAD, DEFAULT_USER, silence_beta_warning, thread_config
-from taste_rag.bm25 import build_index, load_chunks, search
-from taste_rag.rag import COLLECTION, INDEX_DIR
-from taste_rag.router_chat import (
+from taste_rag.chat import DEFAULT_THREAD, DEFAULT_USER, silence_beta_warning, thread_config
+from taste_rag.bm25 import build_index, search
+from taste_rag.corpus import load_chunks
+from taste_rag.vector_store import COLLECTION, INDEX_DIR
+from taste_rag.rag_router_rerank import (
     PLAIN_PROMPT,
     SYSTEM_PROMPT,
     ChatState,

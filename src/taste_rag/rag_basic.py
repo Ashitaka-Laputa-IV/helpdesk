@@ -1,4 +1,11 @@
-"""最小 2-step RAG：加载 -> 切分 -> 嵌入 -> 检索 -> 重排 -> 流式生成。"""
+"""最简 2-step RAG：向量召回 -> rerank -> 流式生成。
+
+单轮问答、无对话历史、无路由判断，用来做基线对照。
+索引与开库逻辑在 vector_store.py。
+
+用法:
+    uv run python src/taste_rag/rag_basic.py
+"""
 
 import os
 from collections.abc import Iterator
@@ -7,56 +14,30 @@ from pathlib import Path
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage, SystemMessage
-from langchain_chroma import Chroma
-from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-DOCS_DIR = Path(__file__).resolve().parents[2] / "data" / "langchain-docs"
-INDEX_DIR = Path(__file__).resolve().parents[2] / ".chroma"
-COLLECTION = "helpdesk"  # 已持久化的索引名，改它会读不到现有向量库
-BATCH_SIZE = 1000
+from taste_rag.vector_store import INDEX_DIR, ensure_indexed, open_store
+
 RECALL_K = 10  # 向量召回条数（重排前先放宽）
 TOP_K = 5  # 重排后进入上下文的条数
 SYSTEM_PROMPT = "你是客服助手，只依据给定资料回答问题；资料中没有的信息，直接说明不知道。"
-
-
-def load_documents(data_dir: Path = DOCS_DIR) -> list[Document]:
-    """把 data_dir 下的 markdown 读成 Document。"""
-    return [
-        Document(
-            page_content=path.read_text(encoding="utf-8"),
-            metadata={"source": str(path.relative_to(data_dir))},
-        )
-        for path in sorted(data_dir.rglob("*.md"))
-    ]
 
 
 def build_rag(
     model,
     embeddings,
     reranker,
-    data_dir: Path = DOCS_DIR,
     index_dir: Path = INDEX_DIR,
 ):
     """构建 RAG 问答函数：向量召回 RECALL_K 条，重排后取前 TOP_K 段，流式生成。
 
-    索引持久化在 index_dir（Chroma）。首次运行会切分并写入，之后直接复用，不再重复嵌入。
+    索引持久化在 index_dir（Chroma），首次运行会切分并写入，之后直接复用。
     """
-    store = Chroma(
-        collection_name=COLLECTION,
-        embedding_function=embeddings,
-        persist_directory=str(index_dir),
-    )
-    if not store.get(limit=1)["ids"]:
-        splits = RecursiveCharacterTextSplitter(
-            chunk_size=1000, chunk_overlap=200
-        ).split_documents(load_documents(data_dir))
-        # Chroma 单次写入有上限（约 5461 条），分批写入
-        for start in range(0, len(splits), BATCH_SIZE):
-            store.add_documents(splits[start : start + BATCH_SIZE])
-        print(f"已索引 {len(splits)} 个分块到 {index_dir}")
+    store = open_store(embeddings, index_dir)
+    indexed = ensure_indexed(store)
+    if indexed:
+        print(f"已索引 {indexed} 个分块到 {index_dir}")
 
     retriever = store.as_retriever(search_kwargs={"k": RECALL_K})
 

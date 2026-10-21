@@ -17,7 +17,7 @@ Router 支持两种模式（ROUTER_MODE）：
 注：寒暄/致谢不再用正则特判，统一交给上面这条判断链路。
 
 用法:
-    uv run python src/taste_rag/router_chat.py
+    uv run python src/taste_rag/rag_router_rerank.py
 """
 
 import os
@@ -37,9 +37,10 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from pydantic import BaseModel, Field
 
-from taste_rag import DEFAULT_THREAD, DEFAULT_USER, silence_beta_warning, thread_config
-from taste_rag.bm25 import build_index, load_chunks, search
-from taste_rag.rag import COLLECTION, INDEX_DIR
+from taste_rag.chat import DEFAULT_THREAD, DEFAULT_USER, silence_beta_warning, thread_config
+from taste_rag.bm25 import build_index, search
+from taste_rag.corpus import load_chunks
+from taste_rag.vector_store import COLLECTION, INDEX_DIR
 from taste_rag.summarize import compress_history
 
 DB_PATH = Path(__file__).resolve().parents[2] / ".router_chat.db"

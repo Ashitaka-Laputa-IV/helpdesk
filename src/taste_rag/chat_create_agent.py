@@ -6,7 +6,7 @@
 from langchain.agents import create_agent
 from langgraph.checkpoint.memory import InMemorySaver
 
-from taste_rag import TOOLS
+from taste_rag.chat import TOOLS
 
 SYSTEM_PROMPT = "你是客服助手，回答要简洁；需要当前时间时调用工具获取，不要自己猜。"
 
