@@ -23,7 +23,7 @@ uv run python data/download_docs.py
 
 下载约 180 个 markdown 文件（约 5 MB）到 `data/langchain-docs/`，目录结构镜像官方路径。
 
-语料更新后，需重建向量索引（删除项目根目录的 `.chroma/` 再运行 RAG）。
+语料更新后需重建向量索引：删除项目根目录的 `.chroma/`，再按根目录 README 的「建向量索引」命令重新生成。
 
 ## 版权
 
