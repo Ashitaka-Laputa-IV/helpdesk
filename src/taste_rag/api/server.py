@@ -21,6 +21,7 @@ from pydantic import BaseModel
 
 from taste_rag.chat.basic import DB_PATH, build_graph
 from taste_rag.core import runtime
+from taste_rag.core.errors import explain_error
 from taste_rag.core.session import thread_config
 
 
@@ -54,16 +55,19 @@ def chat(request: ChatRequest) -> StreamingResponse:
     config = thread_config(request.user_id, request.thread_id)
 
     def generate() -> Iterator[str]:
-        stream = graph.stream_events(
-            {"messages": [HumanMessage(content=request.message)]},
-            config,
-            version="v3",
-        )
-        for _, item in stream.interleave("messages"):
-            if item.node != "chatbot":
-                continue
-            for token in item.text:
-                yield _sse({"type": "token", "text": token})
+        try:
+            stream = graph.stream_events(
+                {"messages": [HumanMessage(content=request.message)]},
+                config,
+                version="v3",
+            )
+            for _, item in stream.interleave("messages"):
+                if item.node != "chatbot":
+                    continue
+                for token in item.text:
+                    yield _sse({"type": "token", "text": token})
+        except Exception as error:  # noqa: BLE001 - 单轮失败不应中断连接
+            yield _sse({"type": "error", "message": explain_error(error)})
         yield _sse({
             "type": "end",
             "user_id": request.user_id,

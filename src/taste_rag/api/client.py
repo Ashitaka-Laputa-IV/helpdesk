@@ -15,8 +15,16 @@ DEFAULT_BASE_URL = "http://127.0.0.1:8000"
 
 
 def ask(client: httpx.Client, base_url: str, user_id: str, thread_id: str, message: str) -> None:
-    """发一条消息，把 SSE 流里的 token 实时打印出来。"""
+    """发一条消息，把 SSE 流里的 token 实时打印出来；出错只提示一句。"""
     payload = {"user_id": user_id, "thread_id": thread_id, "message": message}
+    started = False
+
+    def prefix() -> None:
+        nonlocal started
+        if not started:
+            print("AI: ", end="", flush=True)
+            started = True
+
     try:
         with client.stream("POST", f"{base_url}/chat", json=payload) as response:
             response.raise_for_status()
@@ -25,11 +33,23 @@ def ask(client: httpx.Client, base_url: str, user_id: str, thread_id: str, messa
                     continue
                 event = json.loads(line[6:])
                 if event["type"] == "token":
+                    prefix()
                     print(event["text"], end="", flush=True)
+                elif event["type"] == "error":
+                    prefix()
+                    print(f"\n[错误] {event['message']}", end="")
+    except httpx.ConnectError:
+        prefix()
+        print("\n[错误] 连接不上服务：请先启动 `uvicorn taste_rag.api.server:app`。", end="")
+    except httpx.HTTPStatusError as exc:
+        prefix()
+        print(f"\n[错误] 服务返回 {exc.response.status_code}：{exc.response.text[:120]}", end="")
     except httpx.HTTPError as exc:
-        print(f"\n请求失败: {exc}")
-    else:
-        print()
+        prefix()
+        print(f"\n[错误] {exc}", end="")
+    finally:
+        if started:
+            print()
 
 
 def main() -> None:
@@ -54,7 +74,6 @@ def main() -> None:
             if message.strip().lower() in {"exit", "quit"}:
                 break
             if message.strip():
-                print("AI: ", end="", flush=True)
                 ask(client, args.base_url, args.user, args.thread, message)
 
 

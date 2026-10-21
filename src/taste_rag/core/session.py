@@ -5,7 +5,7 @@
 """
 
 DEFAULT_USER = "default"
-DEFAULT_THREAD = "basic"  # 命令行默认会话名
+DEFAULT_THREAD = "default"
 
 
 def thread_key(user_id: str, thread_id: str) -> str:

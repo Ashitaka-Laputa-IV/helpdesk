@@ -11,8 +11,7 @@ import argparse
 from pathlib import Path
 from typing import Literal
 
-from dotenv import load_dotenv
-from langchain.messages import HumanMessage, SystemMessage
+from langchain.messages import SystemMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
@@ -59,34 +58,18 @@ def main() -> None:
     args = parser.parse_args()
 
     runtime.silence_warnings()
-    load_dotenv()
     model = runtime.load_model()
     config = thread_config(args.user, args.thread)
 
     # 历史存 .chat.db，按 (user, thread) 隔离；只传新消息，LangGraph 自动接上历史
     with SqliteSaver.from_conn_string(str(DB_PATH)) as checkpointer:
         graph = build_graph(model, checkpointer)
-        print(f"[{args.user}/{args.thread}] 输入内容开始对话，输入 exit / quit 结束。")
-        while True:
-            try:
-                user_input = input("You: ")
-            except (EOFError, KeyboardInterrupt):
-                break
-            if user_input.strip().lower() in {"exit", "quit"}:
-                break
-
-            print("AI: ", end="", flush=True)
-            stream = graph.stream_events(
-                {"messages": [HumanMessage(content=user_input)]},
-                config,
-                version="v3",
-            )
-            # 投影消费：messages 投影按节点给出逐 token 文本
-            for _, item in stream.interleave("messages"):
-                if item.node == "chatbot":
-                    for token in item.text:
-                        print(token, end="", flush=True)
-            print()
+        runtime.run_cli(
+            lambda question: runtime.stream_answer(graph, config, question),
+            prompt="You: ",
+            reply_prefix="AI: ",
+            intro=f"[{args.user}/{args.thread}] 输入内容开始对话，输入 exit / quit 结束。",
+        )
 
 
 if __name__ == '__main__':

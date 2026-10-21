@@ -9,6 +9,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Any
 
+from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage
 from langchain_core._api import LangChainBetaWarning
@@ -17,6 +18,7 @@ from langchain_reranker.rerankers import init_reranker
 
 from taste_rag.core.bm25 import build_index
 from taste_rag.core.corpus import load_chunks
+from taste_rag.core.errors import explain_error
 from taste_rag.core.vector_store import open_store
 
 DEFAULT_ROUTER_MAX_TOKENS = 128  # 留出余量：历史较长时模型偶尔会多写几个 token
@@ -56,11 +58,13 @@ def silence_warnings() -> None:
 
 def load_model():
     """对话模型。"""
+    load_dotenv()  # 各入口都从这里取模型，统一在这里读 .env
     return init_chat_model(os.environ["MODEL"])
 
 
 def load_router_model(max_tokens: int = DEFAULT_ROUTER_MAX_TOKENS):
     """路由器模型：可指向另一个服务（例如非思考的小模型），默认复用对话模型。"""
+    load_dotenv()
     return init_chat_model(
         os.environ.get("ROUTER_MODEL", os.environ["MODEL"]),
         base_url=os.environ.get("ROUTER_BASE_URL", os.environ["OPENAI_API_BASE"]),
@@ -72,6 +76,7 @@ def load_router_model(max_tokens: int = DEFAULT_ROUTER_MAX_TOKENS):
 
 def load_embeddings() -> OpenAIEmbeddings:
     """嵌入模型。"""
+    load_dotenv()
     return OpenAIEmbeddings(
         model=os.environ["EMBEDDING_MODEL"],
         base_url=os.environ["EMBEDDING_BASE_URL"],
@@ -82,6 +87,7 @@ def load_embeddings() -> OpenAIEmbeddings:
 
 def load_reranker():
     """重排模型。"""
+    load_dotenv()
     return init_reranker(
         os.environ["RERANKER_MODEL"], base_url=os.environ["RERANKER_BASE_URL"]
     )
@@ -122,22 +128,39 @@ def stream_answer(
             yield from item.text
 
 
-def run_cli(answer: Callable[[str], Iterator[str]]) -> None:
-    """交互式问答：输入问题，逐 token 打印回答。"""
-    print("输入问题开始问答，输入 exit / quit 结束。")
+def run_cli(
+    answer: Callable[[str], Iterator[str]],
+    prompt: str = "Q: ",
+    reply_prefix: str = "A: ",
+    intro: str = "输入问题开始问答，输入 exit / quit 结束。",
+) -> None:
+    """交互式问答：输入问题，逐 token 打印回答。
+
+    单轮失败只打印一句提示并继续，不把 traceback 甩给用户。
+    """
+    print(intro)
     while True:
         try:
-            question = input("Q: ")
+            question = input(prompt)
         except (EOFError, KeyboardInterrupt):
             break
         if question.strip().lower() in {"exit", "quit"}:
             break
 
-        # "A: " 延迟到首个 token 再打印，否则会被节点日志插在中间
+        # 前缀延迟到首个 token 再打印，否则会被节点日志插在中间
         started = False
-        for token in answer(question):
-            if not started:
-                print("A: ", end="", flush=True)
-                started = True
-            print(token, end="", flush=True)
+        try:
+            for token in answer(question):
+                if not started:
+                    print(reply_prefix, end="", flush=True)
+                    started = True
+                print(token, end="", flush=True)
+        except KeyboardInterrupt:
+            print("\n[中断] 已停止本轮输出。")
+            continue
+        except Exception as error:  # noqa: BLE001 - 单轮失败不应结束会话
+            if started:
+                print()
+            print(f"[错误] {explain_error(error)}")
+            continue
         print()
