@@ -1,22 +1,19 @@
 """Agentic RAG：检索交给 create_agent 决定，而不是固定编排。
 
-和 rag_router_rerank.py 的区别：
-  - rag_router_rerank：router 节点先判「要不要检索」，再走固定的 召回 -> 合并 -> 重排 -> 生成。
+和 rag_router.py 的区别：
+  - rag_router：router 节点先判「要不要检索」，再走固定的 召回 -> 合并 -> 重排 -> 生成。
   - rag_agent：只提供一个 search_knowledge_base 工具，何时检索、检索几次、要不要再查，
     全部由模型自己决定。
 
-检索链路与固定编排保持一致：bm25(40) + 语义(20) 去重 -> 重排取前 5。
+检索链路与固定编排保持一致：bm25(10) + 语义(15) 去重 -> 重排取前 5。
 只提供构建函数，对比测试见 tests/compare_rag.py。
 """
 
-from concurrent.futures import ThreadPoolExecutor
-
 from langchain.agents import create_agent
 from langchain.tools import tool
-from langchain_core.documents import Document
 from langgraph.checkpoint.memory import InMemorySaver
 
-from taste_rag.bm25 import search
+from taste_rag.retrieval import dedupe, format_context, recall_both, rerank_candidates
 
 BM25_K = 10
 TOP_K = 5
@@ -45,32 +42,15 @@ def build_search_tool(bm25, chunks, retriever, reranker):
         Args:
             query: 检索关键词，写清技术名词即可，不要写成完整长句。
         """
-        # 1) 并行召回：bm25 与向量检索同时跑（前者本地计算，后者走 HTTP），按 (来源, 原文) 去重
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            bm25_future = pool.submit(search, bm25, chunks, query, BM25_K)
-            vector_future = pool.submit(retriever.invoke, query)
-            bm25_hits = bm25_future.result()
-            vector_docs = vector_future.result()
-
-        candidates = [{"source": s, "text": t} for _, s, t in bm25_hits]
-        seen = {(c["source"], c["text"]) for c in candidates}
-        for doc in vector_docs:
-            key = (doc.metadata["source"], doc.page_content)
-            if key not in seen:
-                seen.add(key)
-                candidates.append({"source": key[0], "text": key[1]})
+        # 1) 并行召回 -> 按 (来源, 原文) 去重
+        bm25_docs, vector_docs = recall_both(bm25, chunks, retriever, query, BM25_K)
+        candidates = dedupe([bm25_docs, vector_docs])
 
         # 2) 重排取前 TOP_K
-        documents = [
-            Document(page_content=c["text"], metadata={"source": c["source"]})
-            for c in candidates
-        ]
-        ranked = reranker.compress_documents(documents, query=query)[:TOP_K]
+        ranked = rerank_candidates(reranker, candidates, query, TOP_K)
         if not ranked:
             return "没有检索到相关内容。"
-        return "\n\n".join(
-            f"[{doc.metadata['source']}] {doc.page_content}" for doc in ranked
-        )
+        return format_context(ranked)
 
     return search_knowledge_base
 

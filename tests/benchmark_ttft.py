@@ -35,8 +35,8 @@ from taste_rag.bm25 import build_index
 from taste_rag.corpus import load_chunks
 from taste_rag.vector_store import COLLECTION, INDEX_DIR
 from taste_rag.rag_agent import build_agent
-from taste_rag.rag_router_rerank import ROUTER_MAX_TOKENS, silence_serializer_warning
-from taste_rag.rag_router_rrf import SEMANTIC_K, build_graph
+from taste_rag.runtime import DEFAULT_ROUTER_MAX_TOKENS as ROUTER_MAX_TOKENS, silence_serializer_warning
+from taste_rag.rag_router import BM25_K_FUSION, SEMANTIC_K, build_graph
 
 QUESTIONS = [
     "How do I define a tool in LangChain?",
@@ -108,7 +108,7 @@ def main() -> None:
     graphs = {
         scheme: build_graph(
             model, router_model, bm25, chunks, retriever, InMemorySaver(),
-            "llm", ranking=scheme, reranker=reranker,
+            "llm", ranking=scheme, bm25_k=BM25_K_FUSION, reranker=reranker,
         )
         for scheme in ("none", "rerank", "rrf")
     }

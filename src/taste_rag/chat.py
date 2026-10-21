@@ -14,7 +14,7 @@ from typing import Literal
 
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
-from langchain.messages import HumanMessage
+from langchain.messages import HumanMessage, SystemMessage
 from langchain.tools import tool
 from langchain_core._api import LangChainBetaWarning
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -56,12 +56,19 @@ def load_model():
     return init_chat_model(os.environ["MODEL"])
 
 
-def build_graph(model, checkpointer=None):
-    """构建并编译 chat 图。"""
+def build_graph(model, checkpointer=None, system_prompt: str | None = None):
+    """构建并编译 chat 图。
+
+    system_prompt 为 None 时不插入 system 消息（保持最简）；
+    需要固定人设时传入，节点会在每轮对话前补上。
+    """
     model_with_tools = model.bind_tools(TOOLS)
 
     def chatbot(state: MessagesState) -> dict:
-        return {"messages": [model_with_tools.invoke(state["messages"])]}
+        messages = state["messages"]
+        if system_prompt:
+            messages = [SystemMessage(content=system_prompt), *messages]
+        return {"messages": [model_with_tools.invoke(messages)]}
 
     def should_continue(state: MessagesState) -> Literal["tools", END]:
         if state["messages"][-1].tool_calls:

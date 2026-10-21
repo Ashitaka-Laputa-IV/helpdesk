@@ -30,7 +30,7 @@ from langchain_reranker.rerankers import init_reranker
 from taste_rag.bm25 import build_index, search
 from taste_rag.corpus import load_chunks
 from taste_rag.vector_store import COLLECTION, INDEX_DIR
-from taste_rag.rag_router_rrf import BM25_K, RRF_K, SEMANTIC_K
+from taste_rag.rag_router import BM25_K_FUSION, RRF_K, SEMANTIC_K
 
 EVAL_PATH = Path(__file__).resolve().parents[1] / "data" / "eval" / "queries.json"
 TOP_NS = (5, 8, 10)
@@ -99,7 +99,7 @@ def main() -> None:
     )
 
     queries = json.loads(EVAL_PATH.read_text(encoding="utf-8"))
-    print(f"召回池: bm25_k={BM25_K} + sem_k={SEMANTIC_K} | RRF k={RRF_K}")
+    print(f"召回池: bm25_k={BM25_K_FUSION} + sem_k={SEMANTIC_K} | RRF k={RRF_K}")
 
     for tier in TIERS:
         items = [q for q in queries if q["tier"] == tier]
@@ -107,7 +107,7 @@ def main() -> None:
         # 召回：每条查询取一次 bm25 与向量结果
         rows = []
         for item in items:
-            hits = search(bm25, chunks, item["query"], BM25_K)
+            hits = search(bm25, chunks, item["query"], BM25_K_FUSION)
             docs = retriever.invoke(item["query"])
             rows.append(
                 {
