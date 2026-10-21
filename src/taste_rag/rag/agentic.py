@@ -42,7 +42,8 @@ SYSTEM_PROMPT = """你是一名技术客服，回答必须依据文档检索结�
 
 【什么时候调用工具 search_knowledge_base】
 - 问题涉及 LangChain、LangGraph 的概念、API、类名、参数、配置方式时，先调用它，不要凭记忆作答。
-- 一次检索结果不相关或信息不全时，换更准确的关键词再检索，最多 3 次。
+- 检索词一律用英文：文档库是英文的，中文问句要先提炼成英文技术名词再查。
+- 一次检索结果不相关或信息不全时，换更准确的英文关键词再检索，最多 3 次。
 - 寒暄（你好、谢谢、再见）、与文档无关的闲聊、或者对话历史里已经给出过答案时，不要调用工具，直接回答。
 
 【怎么回答】
@@ -56,10 +57,11 @@ def build_search_tool(bm25, chunks, retriever, reranker):
 
     @tool
     def search_knowledge_base(query: str) -> str:
-        """在 LangChain / LangGraph 官方文档库中检索，返回最相关的几段原文。
+        """在 LangChain / LangGraph 官方文档库（英文语料）中检索，返回最相关的几段原文。
 
         Args:
-            query: 检索关键词，写清技术名词即可，不要写成完整长句。
+            query: 必须是英文关键词，用文档里的技术名词（如 "create_agent"、"interrupt"），
+                不要写整句中文或完整长句。
         """
         # 1) 两路召回 -> 按 (来源, 原文) 去重
         candidates = dedupe(
