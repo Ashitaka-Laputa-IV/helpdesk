@@ -18,8 +18,8 @@ from taste_rag.rag.common import PROMPT_WITH_DOCS
 from taste_rag.core.retrieval import format_context, rerank, sem_candidates
 from taste_rag.core.vector_store import INDEX_DIR, ensure_indexed, open_store
 
-RECALL_K = 10  # 向量召回条数（重排前先放宽）
-TOP_K = 5  # 重排后进入上下文的条数
+RECALL_K = 20  # 向量召回条数（重排前先放宽）
+TOP_K = 10  # 重排后进入上下文的条数
 
 
 def build_rag(
