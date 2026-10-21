@@ -2,13 +2,12 @@
 
 图结构：START -> chatbot -> (tools -> chatbot)* -> END
 chatbot 节点调用模型；当模型请求调用工具时，先由 tools 节点执行，再回到 chatbot。
-对话历史通过 SqliteSaver checkpointer 持久化到 .chat.db，并按 (user_id, thread_id) 隔离。
+对话历史通过 SqliteSaver checkpointer 持久化到 .db/chat.db，并按 (user_id, thread_id) 隔离。
 
 通用的东西都在 core：工具在 core.tools，会话与模型装配在 core.session / core.runtime。
 """
 
 import argparse
-from pathlib import Path
 from typing import Literal
 
 from langchain.messages import SystemMessage
@@ -17,10 +16,11 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from taste_rag.core import runtime
+from taste_rag.core.paths import db_path
 from taste_rag.core.session import DEFAULT_THREAD, DEFAULT_USER, thread_config
 from taste_rag.core.tools import TOOLS
 
-DB_PATH = Path(__file__).resolve().parents[3] / ".chat.db"
+DB_PATH = db_path("chat.db")
 
 
 def build_graph(model, checkpointer=None, system_prompt: str | None = None):
@@ -61,7 +61,7 @@ def main() -> None:
     model = runtime.load_model()
     config = thread_config(args.user, args.thread)
 
-    # 历史存 .chat.db，按 (user, thread) 隔离；只传新消息，LangGraph 自动接上历史
+    # 历史存 .db/chat.db，按 (user, thread) 隔离；只传新消息，LangGraph 自动接上历史
     with SqliteSaver.from_conn_string(str(DB_PATH)) as checkpointer:
         graph = build_graph(model, checkpointer)
         runtime.run_cli(

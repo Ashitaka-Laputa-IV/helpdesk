@@ -4,9 +4,4 @@ __pycache__/
 *.py[cod]
 .chroma/
 data/langchain-docs/
-.chat.db*
-.agent_chat.db*
-.agentic_rag.db*
-.bm25_chat.db*
-.router_chat.db*
-.router_chat_rrf.db*
+.db/

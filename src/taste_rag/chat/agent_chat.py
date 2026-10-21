@@ -2,23 +2,23 @@
 
 两种用法：
 - build_agent(model)：默认内存历史，供对比测试（tests/compare_chatbots.py）使用
-- main()：命令行入口，用 SqliteSaver 把历史落盘到 .agent_chat.db
+- main()：命令行入口，用 SqliteSaver 把历史落盘到 .db/agent_chat.db
 
 图、工具循环、消息合并都由 create_agent 负责，本模块只提供提示词与外壳。
 """
 
 import argparse
-from pathlib import Path
 
 from langchain.agents import create_agent
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from taste_rag.core import runtime
+from taste_rag.core.paths import db_path
 from taste_rag.core.session import DEFAULT_THREAD, DEFAULT_USER, thread_config
 from taste_rag.core.tools import TOOLS
 
-DB_PATH = Path(__file__).resolve().parents[3] / ".agent_chat.db"
+DB_PATH = db_path("agent_chat.db")
 SYSTEM_PROMPT = "你是客服助手，回答要简洁；需要当前时间时调用工具获取，不要自己猜。"
 
 
@@ -44,7 +44,7 @@ def main() -> None:
     runtime.silence_warnings()
     config = thread_config(args.user, args.thread)
 
-    # 历史存 .agent_chat.db，按 (user, thread) 隔离；create_agent 自己接上历史
+    # 历史存 .db/agent_chat.db，按 (user, thread) 隔离；create_agent 自己接上历史
     with SqliteSaver.from_conn_string(str(DB_PATH)) as checkpointer:
         agent = build_agent(runtime.load_model(), checkpointer)
         runtime.run_cli(

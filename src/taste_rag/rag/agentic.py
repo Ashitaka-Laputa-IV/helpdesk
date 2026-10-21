@@ -8,15 +8,13 @@
 检索链路与固定编排保持一致：bm25(10) + 语义(15) 去重 -> 重排取前 5。
 
 build_agent 供对比测试使用（tests/compare_rag.py，默认内存历史）；
-main() 是命令行入口，历史落盘到 .agentic_rag.db。
+main() 是命令行入口，历史落盘到 .db/agentic_rag.db。
 两者都挂官方 SummarizationMiddleware：历史超过 SUMMARY_TRIGGER_TOKENS 时压成摘要，
 只保留最近 SUMMARY_KEEP_MESSAGES 条原文。
 
 用法:
     uv run python -m taste_rag.rag.agentic
 """
-
-from pathlib import Path
 
 from dotenv import load_dotenv
 from langchain.agents import create_agent
@@ -26,6 +24,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from taste_rag.core import runtime
+from taste_rag.core.paths import db_path
 from taste_rag.core.retrieval import (
     bm25_candidates,
     dedupe,
@@ -36,7 +35,7 @@ from taste_rag.core.retrieval import (
 from taste_rag.core.session import thread_config
 from taste_rag.core.summarize import KEEP_MESSAGES, TRIGGER_TOKENS
 
-DB_PATH = Path(__file__).resolve().parents[3] / ".agentic_rag.db"
+DB_PATH = db_path("agentic_rag.db")
 BM25_K = 20
 SEMANTIC_K = 15  # 与 rag/workflow.py 保持一致
 TOP_K = 10
