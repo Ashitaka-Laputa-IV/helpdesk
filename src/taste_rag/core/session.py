@@ -8,11 +8,11 @@ DEFAULT_USER = "default"
 DEFAULT_THREAD = "default"
 
 
-def thread_key(user_id: str, thread_id: str) -> str:
+def thread_key(user_id: str = DEFAULT_USER, thread_id: str = DEFAULT_THREAD) -> str:
     """拼出 checkpointer 的 thread_id，保证不同用户/会话互不串线。"""
     return f"{user_id}:{thread_id}"
 
 
-def thread_config(user_id: str, thread_id: str) -> dict:
-    """构造传给图的 config。"""
+def thread_config(user_id: str = DEFAULT_USER, thread_id: str = DEFAULT_THREAD) -> dict:
+    """构造传给图的 config；不传就落到默认用户 / 默认会话。"""
     return {"configurable": {"thread_id": thread_key(user_id, thread_id)}}
