@@ -4,7 +4,7 @@
 索引与开库逻辑在 vector_store.py，检索原语在 retrieval.py。
 
 用法:
-    uv run python -m taste_rag.rag_basic
+    uv run python -m taste_rag.rag.basic
 """
 
 from collections.abc import Iterator
@@ -13,10 +13,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from langchain.messages import HumanMessage, SystemMessage
 
-from taste_rag import runtime
-from taste_rag.rag_common import PROMPT_WITH_DOCS
-from taste_rag.retrieval import format_context, rerank_candidates, vector_candidates
-from taste_rag.vector_store import INDEX_DIR, ensure_indexed, open_store
+from taste_rag.core import runtime
+from taste_rag.rag.common import PROMPT_WITH_DOCS
+from taste_rag.core.retrieval import format_context, rerank_candidates, vector_candidates
+from taste_rag.core.vector_store import INDEX_DIR, ensure_indexed, open_store
 
 RECALL_K = 10  # 向量召回条数（重排前先放宽）
 TOP_K = 5  # 重排后进入上下文的条数

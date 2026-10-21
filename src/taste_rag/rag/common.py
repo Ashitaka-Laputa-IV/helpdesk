@@ -11,7 +11,7 @@ from langchain.messages import SystemMessage
 from langgraph.graph import MessagesState
 from pydantic import BaseModel, Field
 
-from taste_rag.summarize import compress_history
+from taste_rag.core.summarize import compress_history
 
 # 有资料 / 无资料两种回答姿势
 PROMPT_WITH_DOCS = "你是客服助手，只依据给定资料回答问题；资料中没有的信息，直接说明不知道。"

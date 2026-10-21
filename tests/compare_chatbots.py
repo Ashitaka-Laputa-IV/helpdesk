@@ -14,8 +14,8 @@ from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage
 
-from taste_rag.chat_manual_graph import build_graph
-from taste_rag.chat_create_agent import build_agent
+from taste_rag.chat.manual_graph import build_graph
+from taste_rag.chat.create_agent import build_agent
 
 # 8 轮语料：自我介绍 -> 稳定事实 -> 工具 -> 反复回忆 -> 归纳
 CORPUS = [

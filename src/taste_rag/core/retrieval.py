@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from langchain_core.documents import Document
 
-from taste_rag.bm25 import search
+from taste_rag.core.bm25 import search
 
 RRF_K = 20  # 平滑常数；参数扫描中 20 优于常用的 60
 

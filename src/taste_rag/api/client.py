@@ -1,9 +1,9 @@
 """最简 CLI 客户端，连 taste_rag 的 FastAPI 服务。
 
-先用 `uv run uvicorn taste_rag.app:app` 起服务，然后:
+先用 `uv run uvicorn taste_rag.api.server:app` 起服务，然后:
 
-    uv run python src/taste_rag/client.py --user u1 --thread t1   # 交互模式
-    uv run python src/taste_rag/client.py "现在几点？"            # 单次提问
+    uv run python -m taste_rag.api.client --user u1 --thread t1   # 交互模式
+    uv run python -m taste_rag.api.client "现在几点？"            # 单次提问
 """
 
 import argparse

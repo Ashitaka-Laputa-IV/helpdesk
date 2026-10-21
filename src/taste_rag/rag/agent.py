@@ -13,7 +13,7 @@ from langchain.agents import create_agent
 from langchain.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 
-from taste_rag.retrieval import dedupe, format_context, recall_both, rerank_candidates
+from taste_rag.core.retrieval import dedupe, format_context, recall_both, rerank_candidates
 
 BM25_K = 10
 TOP_K = 5

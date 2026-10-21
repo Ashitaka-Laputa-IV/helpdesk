@@ -3,15 +3,15 @@
 语料读取与切块在 corpus.py，本模块只负责索引本身。
 
 用法:
-    uv run python src/taste_rag/bm25.py "how to define a tool"
-    uv run python src/taste_rag/bm25.py            # 交互模式
+    uv run python -m taste_rag.core.bm25 "how to define a tool"
+    uv run python -m taste_rag.core.bm25            # 交互模式
 """
 
 import argparse
 
 import bm25s
 
-from taste_rag.corpus import DOCS_DIR, load_chunks
+from taste_rag.core.corpus import DOCS_DIR, load_chunks
 
 TOP_K = 5
 

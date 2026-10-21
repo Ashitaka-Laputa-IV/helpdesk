@@ -6,7 +6,7 @@ retrieve 节点对每条查询跑 bm25s，按累加得分融合后用重排模�
 chatbot  节点据 context 与对话历史作答
 
 用法:
-    uv run python -m taste_rag.rag_bm25_rerank
+    uv run python -m taste_rag.rag.bm25_rerank
 """
 
 import re
@@ -17,10 +17,10 @@ from langchain.messages import HumanMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 
-from taste_rag import runtime
-from taste_rag.bm25 import search
-from taste_rag.rag_common import RagState, make_answer_node
-from taste_rag.retrieval import format_context, rerank_candidates
+from taste_rag.core import runtime
+from taste_rag.core.bm25 import search
+from taste_rag.rag.common import RagState, make_answer_node
+from taste_rag.core.retrieval import format_context, rerank_candidates
 
 DB_PATH = Path(__file__).resolve().parents[2] / ".bm25_chat.db"
 THREAD_ID = "bm25-chat-test"

@@ -15,9 +15,9 @@ from langchain_core._api import LangChainBetaWarning
 from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 
-from taste_rag.bm25 import build_index
-from taste_rag.corpus import load_chunks
-from taste_rag.vector_store import open_store
+from taste_rag.core.bm25 import build_index
+from taste_rag.core.corpus import load_chunks
+from taste_rag.core.vector_store import open_store
 
 DEFAULT_ROUTER_MAX_TOKENS = 128  # 留出余量：历史较长时模型偶尔会多写几个 token
 DEFAULT_ROUTER_MODE = "llm"

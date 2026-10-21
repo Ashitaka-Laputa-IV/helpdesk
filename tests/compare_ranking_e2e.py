@@ -24,11 +24,11 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 from langgraph.checkpoint.memory import InMemorySaver
 
-from taste_rag.bm25 import build_index
-from taste_rag.corpus import load_chunks
-from taste_rag.vector_store import COLLECTION, INDEX_DIR
-from taste_rag.runtime import DEFAULT_ROUTER_MAX_TOKENS as ROUTER_MAX_TOKENS, silence_serializer_warning
-from taste_rag.rag_router import BM25_K_FUSION, SEMANTIC_K, build_graph
+from taste_rag.core.bm25 import build_index
+from taste_rag.core.corpus import load_chunks
+from taste_rag.core.vector_store import COLLECTION, INDEX_DIR
+from taste_rag.core.runtime import DEFAULT_ROUTER_MAX_TOKENS as ROUTER_MAX_TOKENS, silence_serializer_warning
+from taste_rag.rag.router import BM25_K_FUSION, SEMANTIC_K, build_graph
 
 # 只测必检索的问题：非检索轮三方没有差别（都不排序）
 QUESTIONS = [

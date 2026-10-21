@@ -6,7 +6,7 @@
     GET  /health
 
 启动:
-    uv run uvicorn taste_rag.app:app --reload
+    uv run uvicorn taste_rag.api.server:app --reload
 """
 
 import json
@@ -19,7 +19,7 @@ from langchain.messages import HumanMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 from pydantic import BaseModel
 
-from taste_rag.chat import (
+from taste_rag.chat.basic import (
     DB_PATH,
     build_graph,
     load_model,

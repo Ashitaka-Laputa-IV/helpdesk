@@ -32,11 +32,11 @@ from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 
-from taste_rag.bm25 import build_index, search
-from taste_rag.corpus import DOCS_DIR, load_chunks
-from taste_rag.vector_store import COLLECTION, INDEX_DIR
-from taste_rag.rag_agent import BM25_K, TOP_K
-from taste_rag.rag_router import SEMANTIC_K
+from taste_rag.core.bm25 import build_index, search
+from taste_rag.core.corpus import DOCS_DIR, load_chunks
+from taste_rag.core.vector_store import COLLECTION, INDEX_DIR
+from taste_rag.rag.agent import BM25_K, TOP_K
+from taste_rag.rag.router import SEMANTIC_K
 
 SEED = 42
 

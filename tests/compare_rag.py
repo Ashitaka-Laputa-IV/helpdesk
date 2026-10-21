@@ -20,12 +20,12 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 from langgraph.checkpoint.memory import InMemorySaver
 
-from taste_rag.bm25 import build_index
-from taste_rag.corpus import load_chunks
-from taste_rag.vector_store import COLLECTION, INDEX_DIR
-from taste_rag.rag_agent import build_agent
-from taste_rag.rag_router import SEMANTIC_K, build_graph
-from taste_rag.runtime import DEFAULT_ROUTER_MAX_TOKENS as ROUTER_MAX_TOKENS
+from taste_rag.core.bm25 import build_index
+from taste_rag.core.corpus import load_chunks
+from taste_rag.core.vector_store import COLLECTION, INDEX_DIR
+from taste_rag.rag.agent import build_agent
+from taste_rag.rag.router import SEMANTIC_K, build_graph
+from taste_rag.core.runtime import DEFAULT_ROUTER_MAX_TOKENS as ROUTER_MAX_TOKENS
 
 # (问题, 是否应该检索, 答案应包含的关键词)
 # 语料是英文文档，查询也必须用英文，否则测到的是语种不匹配而不是检索能力

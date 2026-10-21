@@ -8,8 +8,8 @@
 
 from langgraph.checkpoint.memory import InMemorySaver
 
-from taste_rag.chat import build_graph as build_chat_graph
-from taste_rag.chat_create_agent import SYSTEM_PROMPT
+from taste_rag.chat.basic import build_graph as build_chat_graph
+from taste_rag.chat.create_agent import SYSTEM_PROMPT
 
 
 def build_graph(llm):

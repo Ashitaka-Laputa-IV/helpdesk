@@ -30,11 +30,11 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 from langgraph.checkpoint.memory import InMemorySaver
 
-from taste_rag.bm25 import build_index
-from taste_rag.corpus import load_chunks
-from taste_rag.vector_store import COLLECTION, INDEX_DIR
-from taste_rag.runtime import DEFAULT_ROUTER_MAX_TOKENS as ROUTER_MAX_TOKENS, silence_serializer_warning
-from taste_rag.rag_router import SEMANTIC_K, build_graph
+from taste_rag.core.bm25 import build_index
+from taste_rag.core.corpus import load_chunks
+from taste_rag.core.vector_store import COLLECTION, INDEX_DIR
+from taste_rag.core.runtime import DEFAULT_ROUTER_MAX_TOKENS as ROUTER_MAX_TOKENS, silence_serializer_warning
+from taste_rag.rag.router import SEMANTIC_K, build_graph
 
 # (问题, 是否需要检索)：混入寒暄与历史问题，才能看出"要不要判断"的差别
 CORPUS = [

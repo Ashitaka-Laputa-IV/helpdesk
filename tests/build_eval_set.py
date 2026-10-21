@@ -21,7 +21,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 
-from taste_rag.corpus import DOCS_DIR, load_chunks
+from taste_rag.core.corpus import DOCS_DIR, load_chunks
 
 SEED = 42
 OUT_PATH = Path(__file__).resolve().parents[1] / "data" / "eval" / "queries.json"

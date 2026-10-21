@@ -9,7 +9,7 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from taste_rag.corpus import CHUNK_OVERLAP, CHUNK_SIZE, DOCS_DIR
+from taste_rag.core.corpus import CHUNK_OVERLAP, CHUNK_SIZE, DOCS_DIR
 
 INDEX_DIR = Path(__file__).resolve().parents[2] / ".chroma"
 COLLECTION = "helpdesk"  # 已持久化的索引名，改它会读不到现有向量库

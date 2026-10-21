@@ -16,7 +16,7 @@ Router 支持两种模式（ROUTER_MODE）：
   - always：一律检索，不做判断（兜底或对比用）
 
 用法:
-    uv run python -m taste_rag.rag_router
+    uv run python -m taste_rag.rag.router
 """
 
 import os
@@ -26,16 +26,16 @@ from dotenv import load_dotenv
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 
-from taste_rag import runtime
-from taste_rag.chat import DEFAULT_THREAD, DEFAULT_USER, thread_config
-from taste_rag.rag_common import (
+from taste_rag.core import runtime
+from taste_rag.chat.basic import DEFAULT_THREAD, DEFAULT_USER, thread_config
+from taste_rag.rag.common import (
     RouteDecision,
     RouterState,
     make_answer_node,
     make_router_node,
     make_summarize_node,
 )
-from taste_rag.retrieval import (
+from taste_rag.core.retrieval import (
     RRF_K,
     bm25_candidates,
     dedupe,
