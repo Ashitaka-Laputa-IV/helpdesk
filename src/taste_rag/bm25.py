@@ -3,8 +3,8 @@
 对 data/langchain-docs 下的 markdown 做稀疏(词频)检索，只用 bm25s + 标准库。
 
 用法:
-    uv run python src/helpdesk/bm25.py "how to define a tool"
-    uv run python src/helpdesk/bm25.py            # 交互模式
+    uv run python src/taste_rag/bm25.py "how to define a tool"
+    uv run python src/taste_rag/bm25.py            # 交互模式
 """
 
 import argparse

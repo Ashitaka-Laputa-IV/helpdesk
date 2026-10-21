@@ -8,7 +8,7 @@
 | `rag-demo.toml` | 全部参数与提示词，代码内无字面量配置 |
 | `test-rag-demo.py` | 独立测试：importlib 加载、统计首字/耗时/判定/关键词 |
 
-`rag-demo.py` 不 import 项目内任何模块（`src/helpdesk` 未被引用），只依赖第三方库：
+`rag-demo.py` 不 import 项目内任何模块（`src/taste_rag` 未被引用），只依赖第三方库：
 langchain / langgraph / chroma / bm25s / langchain-reranker。
 
 ## 2. 参数外置

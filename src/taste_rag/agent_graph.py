@@ -13,8 +13,8 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from helpdesk import TOOLS
-from helpdesk.agentic_chat import SYSTEM_PROMPT
+from taste_rag import TOOLS
+from taste_rag.agentic_chat import SYSTEM_PROMPT
 
 
 def build_graph(llm):

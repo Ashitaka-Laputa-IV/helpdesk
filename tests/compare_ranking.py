@@ -27,9 +27,9 @@ from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 
-from helpdesk.bm25 import build_index, load_chunks, search
-from helpdesk.rag import COLLECTION, INDEX_DIR
-from helpdesk.router_chat_rrf import BM25_K, RRF_K, SEMANTIC_K
+from taste_rag.bm25 import build_index, load_chunks, search
+from taste_rag.rag import COLLECTION, INDEX_DIR
+from taste_rag.router_chat_rrf import BM25_K, RRF_K, SEMANTIC_K
 
 EVAL_PATH = Path(__file__).resolve().parents[1] / "data" / "eval" / "queries.json"
 TOP_NS = (5, 8, 10)

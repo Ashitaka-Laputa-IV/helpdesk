@@ -30,10 +30,10 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 from langgraph.checkpoint.memory import InMemorySaver
 
-from helpdesk.bm25 import build_index, load_chunks
-from helpdesk.rag import COLLECTION, INDEX_DIR
-from helpdesk.router_chat import ROUTER_MAX_TOKENS, silence_serializer_warning
-from helpdesk.router_chat_rrf import SEMANTIC_K, build_graph
+from taste_rag.bm25 import build_index, load_chunks
+from taste_rag.rag import COLLECTION, INDEX_DIR
+from taste_rag.router_chat import ROUTER_MAX_TOKENS, silence_serializer_warning
+from taste_rag.router_chat_rrf import SEMANTIC_K, build_graph
 
 # (问题, 是否需要检索)：混入寒暄与历史问题，才能看出"要不要判断"的差别
 CORPUS = [

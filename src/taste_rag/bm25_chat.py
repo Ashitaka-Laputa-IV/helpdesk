@@ -6,7 +6,7 @@ retrieve 节点对每条查询跑 bm25s，融合去重后用重排模型按原�
 chatbot  节点据 context 与对话历史作答
 
 用法:
-    uv run python -m helpdesk.bm25_chat
+    uv run python -m taste_rag.bm25_chat
 """
 
 import os
@@ -23,7 +23,7 @@ from langchain_reranker.rerankers import init_reranker
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 
-from helpdesk.bm25 import build_index, load_chunks, search
+from taste_rag.bm25 import build_index, load_chunks, search
 
 DB_PATH = Path(__file__).resolve().parents[2] / ".bm25_chat.db"
 THREAD_ID = "bm25-chat-test"

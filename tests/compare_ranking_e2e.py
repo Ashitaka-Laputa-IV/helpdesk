@@ -24,10 +24,10 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 from langgraph.checkpoint.memory import InMemorySaver
 
-from helpdesk.bm25 import build_index, load_chunks
-from helpdesk.rag import COLLECTION, INDEX_DIR
-from helpdesk.router_chat import ROUTER_MAX_TOKENS, silence_serializer_warning
-from helpdesk.router_chat_rrf import SEMANTIC_K, build_graph
+from taste_rag.bm25 import build_index, load_chunks
+from taste_rag.rag import COLLECTION, INDEX_DIR
+from taste_rag.router_chat import ROUTER_MAX_TOKENS, silence_serializer_warning
+from taste_rag.router_chat_rrf import SEMANTIC_K, build_graph
 
 # 只测必检索的问题：非检索轮三方没有差别（都不排序）
 QUESTIONS = [

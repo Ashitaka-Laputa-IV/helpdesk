@@ -6,7 +6,7 @@
     GET  /health
 
 启动:
-    uv run uvicorn helpdesk.app:app --reload
+    uv run uvicorn taste_rag.app:app --reload
 """
 
 import json
@@ -19,7 +19,7 @@ from langchain.messages import HumanMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 from pydantic import BaseModel
 
-from helpdesk import (
+from taste_rag import (
     DB_PATH,
     build_graph,
     load_model,
@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
         yield
 
 
-app = FastAPI(title="helpdesk chat", lifespan=lifespan)
+app = FastAPI(title="taste-rag chat", lifespan=lifespan)
 
 
 class ChatRequest(BaseModel):

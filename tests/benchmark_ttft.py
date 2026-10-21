@@ -31,11 +31,11 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 from langgraph.checkpoint.memory import InMemorySaver
 
-from helpdesk.bm25 import build_index, load_chunks
-from helpdesk.rag import COLLECTION, INDEX_DIR
-from helpdesk.rag_agent import build_agent
-from helpdesk.router_chat import ROUTER_MAX_TOKENS, silence_serializer_warning
-from helpdesk.router_chat_rrf import SEMANTIC_K, build_graph
+from taste_rag.bm25 import build_index, load_chunks
+from taste_rag.rag import COLLECTION, INDEX_DIR
+from taste_rag.rag_agent import build_agent
+from taste_rag.router_chat import ROUTER_MAX_TOKENS, silence_serializer_warning
+from taste_rag.router_chat_rrf import SEMANTIC_K, build_graph
 
 QUESTIONS = [
     "How do I define a tool in LangChain?",

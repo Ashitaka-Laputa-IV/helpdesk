@@ -1,5 +1,5 @@
 [project]
-name = "helpdesk"
+name = "taste-rag"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.scripts]
-helpdesk = "helpdesk:main"
+taste-rag = "taste_rag:main"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]

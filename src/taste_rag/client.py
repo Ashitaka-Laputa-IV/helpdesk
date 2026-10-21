@@ -1,9 +1,9 @@
-"""最简 CLI 客户端，连 helpdesk 的 FastAPI 服务。
+"""最简 CLI 客户端，连 taste_rag 的 FastAPI 服务。
 
-先用 `uv run uvicorn helpdesk.app:app` 起服务，然后:
+先用 `uv run uvicorn taste_rag.app:app` 起服务，然后:
 
-    uv run python src/helpdesk/client.py --user u1 --thread t1   # 交互模式
-    uv run python src/helpdesk/client.py "现在几点？"            # 单次提问
+    uv run python src/taste_rag/client.py --user u1 --thread t1   # 交互模式
+    uv run python src/taste_rag/client.py "现在几点？"            # 单次提问
 """
 
 import argparse
@@ -33,7 +33,7 @@ def ask(client: httpx.Client, base_url: str, user_id: str, thread_id: str, messa
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="helpdesk chat 客户端")
+    parser = argparse.ArgumentParser(description="taste-rag chat 客户端")
     parser.add_argument("message", nargs="?", help="单次提问；不传则进入交互模式")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help="服务地址")
     parser.add_argument("--user", default="default", help="用户标识")

@@ -14,7 +14,7 @@
 
 ## 实现差异
 
-### A. 固定编排（`src/helpdesk/router_chat.py`）
+### A. 固定编排（`src/taste_rag/router_chat.py`）
 
 ```mermaid
 graph TD
@@ -30,7 +30,7 @@ graph TD
 - 是否检索由 **router 节点**单独调一次模型判定（`with_structured_output` 返回 `retrieve/chatbot`）。
 - 检索固定只做**一次**，字段 `context` 传给 chatbot。
 
-### B. Agentic（`src/helpdesk/rag_agent.py`）
+### B. Agentic（`src/taste_rag/rag_agent.py`）
 
 ```mermaid
 graph TD

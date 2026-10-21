@@ -16,7 +16,7 @@ from langchain.tools import tool
 from langchain_core.documents import Document
 from langgraph.checkpoint.memory import InMemorySaver
 
-from helpdesk.bm25 import search
+from taste_rag.bm25 import search
 
 BM25_K = 10
 TOP_K = 5

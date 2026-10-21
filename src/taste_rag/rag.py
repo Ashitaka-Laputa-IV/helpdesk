@@ -15,7 +15,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 DOCS_DIR = Path(__file__).resolve().parents[2] / "data" / "langchain-docs"
 INDEX_DIR = Path(__file__).resolve().parents[2] / ".chroma"
-COLLECTION = "helpdesk"
+COLLECTION = "helpdesk"  # 已持久化的索引名，改它会读不到现有向量库
 BATCH_SIZE = 1000
 RECALL_K = 10  # 向量召回条数（重排前先放宽）
 TOP_K = 5  # 重排后进入上下文的条数
