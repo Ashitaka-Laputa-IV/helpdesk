@@ -42,7 +42,7 @@ from taste_rag.core.retrieval import (
     format_context,
     rerank_candidates,
     rrf_fuse,
-    vector_candidates,
+    sem_candidates,
 )
 
 DB_PATH = Path(__file__).resolve().parents[3] / ".router_chat.db"
@@ -87,7 +87,7 @@ def build_graph(
 
     def semantic_retrieve(state: RouterState) -> dict:
         question = state["messages"][-1].text
-        return {"semantic_docs": vector_candidates(retriever, question)}
+        return {"semantic_docs": sem_candidates(retriever, question)}
 
     def rank(state: RouterState) -> dict:
         """按 ranking 指定的方式挑出进入上下文的文档。"""

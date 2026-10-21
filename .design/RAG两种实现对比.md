@@ -65,7 +65,7 @@ def search_knowledge_base(query: str) -> str:
     """在 LangChain / LangGraph 官方文档库中检索，返回最相关的几段原文。"""
     candidates = dedupe([
         bm25_candidates(bm25, chunks, query, BM25_K),
-        vector_candidates(retriever, query),
+        sem_candidates(retriever, query),
     ])
     # 去重 -> rerank 取前 5
 ```

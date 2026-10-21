@@ -16,8 +16,8 @@ def bm25_candidates(bm25, chunks, query: str, k: int) -> list[dict]:
     return [{"source": s, "text": t} for _, s, t in search(bm25, chunks, query, k)]
 
 
-def vector_candidates(retriever, query: str) -> list[dict]:
-    """向量召回，统一成 {"source", "text"}。"""
+def sem_candidates(retriever, query: str) -> list[dict]:
+    """语义（向量）召回，统一成 {"source", "text"}。"""
     return [
         {"source": doc.metadata["source"], "text": doc.page_content}
         for doc in retriever.invoke(query)

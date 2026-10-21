@@ -18,7 +18,7 @@ from taste_rag.core.retrieval import (
     dedupe,
     format_context,
     rerank_candidates,
-    vector_candidates,
+    sem_candidates,
 )
 
 BM25_K = 10
@@ -52,7 +52,7 @@ def build_search_tool(bm25, chunks, retriever, reranker):
         candidates = dedupe(
             [
                 bm25_candidates(bm25, chunks, query, BM25_K),
-                vector_candidates(retriever, query),
+                sem_candidates(retriever, query),
             ]
         )
 
