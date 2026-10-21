@@ -20,8 +20,9 @@
 graph TD
     Start([Start]) --> Summarize[summarize]
     Summarize --> Router{Router<br/>判是否检索}
-    Router -- 检索 --> BM25[bm25 10]
-    Router -- 检索 --> Semantic[semantic 15]
+    Router -- 检索 --> Rewrite[rewrite<br/>改写成 3 条英文查询]
+    Rewrite --> BM25[bm25 10/条]
+    Rewrite --> Semantic[semantic 15/条]
     Router -- 不检索 --> Chatbot
     BM25 --> Rank[去重 + rerank 取 5]
     Semantic --> Rank
@@ -30,6 +31,7 @@ graph TD
 ```
 
 - 是否检索由 **router 节点**单独调一次模型判定（`with_structured_output` 返回 `retrieve/chatbot`）。
+- 检索前先由 **rewrite 节点**把问题改写成 3 条英文查询：语料是英文文档，中文问句直接查 bm25 基本无效。
 - 检索固定只做**一次**，字段 `context` 传给 chatbot。
 
 ### B. Agentic（`src/taste_rag/rag/agentic.py`）

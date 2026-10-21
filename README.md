@@ -12,6 +12,7 @@
 | 能力 | 说明 |
 |---|---|
 | 双路召回 | bm25s 稀疏 + Chroma 向量，按 `(来源, 原文)` 去重 |
+| 查询重写 | 检索前把问题改写成 3 条英文查询（语料为英文文档） |
 | 三种排序 | `rerank`（cross-encoder）/ `rrf`（名次倒数融合）/ `none`（沿用召回顺序） |
 | 检索判断 | `router_mode=llm` 让模型判断；`always` 一律检索，用于对照 |
 | 多轮历史 | SqliteSaver，按 `(user, thread)` 隔离 |
