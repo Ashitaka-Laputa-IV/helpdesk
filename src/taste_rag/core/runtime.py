@@ -16,7 +16,6 @@ from langchain_core._api import LangChainBetaWarning
 from langchain_openai import OpenAIEmbeddings
 from langchain_reranker.rerankers import init_reranker
 
-from taste_rag.core.bm25 import build_index
 from taste_rag.core.corpus import load_chunks
 from taste_rag.core.errors import explain_error
 from taste_rag.core.vector_store import open_store
@@ -95,6 +94,9 @@ def load_reranker():
 
 def build_bm25() -> tuple[Any, list]:
     """加载语料并建 bm25 索引，返回 (索引, 分块)。"""
+    # 延迟导入：bm25s 只有在真正检索时才需要，也避免 `-m taste_rag.core.bm25` 重复加载
+    from taste_rag.core.bm25 import build_index
+
     chunks = load_chunks()
     print(f"已索引 {len(chunks)} 个分块")
     return build_index(chunks), chunks

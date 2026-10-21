@@ -14,6 +14,7 @@ import bm25s
 from taste_rag.core.corpus import DOCS_DIR, load_chunks
 
 TOP_K = 5
+PREVIEW_CHARS = 20  # 结果预览只显示前多少个字符
 
 
 def build_index(chunks: list[tuple[str, str]]):
@@ -38,8 +39,9 @@ def show(retriever, chunks, query: str, k: int = TOP_K) -> None:
     print(f"\n查询: {query}")
     for rank, (score, source, text) in enumerate(search(retriever, chunks, query, k), 1):
         preview = " ".join(text.split())
+        suffix = "..." if len(preview) > PREVIEW_CHARS else ""
         print(f"  {rank}. {score:6.3f}  {source}")
-        print(f"     {preview}...")
+        print(f"     {preview[:PREVIEW_CHARS]}{suffix}")
 
 
 def main() -> None:
