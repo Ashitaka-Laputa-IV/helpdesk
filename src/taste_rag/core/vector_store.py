@@ -1,6 +1,6 @@
 """Chroma 向量库：文档加载、开库、按需建索引。
 
-只做基础设施；检索后的问答流程见 rag_basic.py。
+只做基础设施；检索后的问答流程见 rag/graph_basic.py。
 """
 
 from pathlib import Path

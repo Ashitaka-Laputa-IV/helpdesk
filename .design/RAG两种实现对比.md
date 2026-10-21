@@ -7,7 +7,7 @@
 | | 流程控制 | 构建函数 |
 |---|---|---|
 | **A** | 固定编排，router 节点决定是否检索 | `rag_router.build_graph(...)` |
-| **B** | `create_agent` + 检索工具，模型自主决定 | `rag_agent.build_agent(...)` |
+| **B** | `create_agent` + 检索工具，模型自主决定 | `rag.agentic.build_agent(...)` |
 
 两者的检索链路完全一致：**bm25(10) + 语义(15) 去重 → rerank 取前 5**。
 区别只在于「要不要检索」这一决策由谁做、以及流程是否写死。
@@ -32,7 +32,7 @@ graph TD
 - 是否检索由 **router 节点**单独调一次模型判定（`with_structured_output` 返回 `retrieve/chatbot`）。
 - 检索固定只做**一次**，字段 `context` 传给 chatbot。
 
-### B. Agentic（`src/taste_rag/rag/agent.py`）
+### B. Agentic（`src/taste_rag/rag/agentic.py`）
 
 ```mermaid
 graph TD

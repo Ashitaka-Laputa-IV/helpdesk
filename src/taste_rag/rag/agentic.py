@@ -2,7 +2,7 @@
 
 和 rag_router.py 的区别：
   - rag_router：router 节点先判「要不要检索」，再走固定的 召回 -> 合并 -> 重排 -> 生成。
-  - rag_agent：只提供一个 search_knowledge_base 工具，何时检索、检索几次、要不要再查，
+  - agentic：只提供一个 search_knowledge_base 工具，何时检索、检索几次、要不要再查，
     全部由模型自己决定。
 
 检索链路与固定编排保持一致：bm25(10) + 语义(15) 去重 -> 重排取前 5。

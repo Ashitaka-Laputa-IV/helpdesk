@@ -1,4 +1,4 @@
-"""串行对比两个 RAG 实现：固定编排（rag_router）vs Agentic（rag_agent）。
+"""串行对比两个 RAG 实现：固定编排（rag.router）vs Agentic（rag.agentic）。
 
 同一模型、同一套语料；A 先跑完全部轮次，B 再跑一遍（串行执行，不并行）。
 每轮记录：耗时、是否触发检索、答案、关键词校验。
@@ -23,7 +23,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from taste_rag.core.bm25 import build_index
 from taste_rag.core.corpus import load_chunks
 from taste_rag.core.vector_store import COLLECTION, INDEX_DIR
-from taste_rag.rag.agent import build_agent
+from taste_rag.rag.agentic import build_agent
 from taste_rag.rag.router import SEMANTIC_K, build_graph
 from taste_rag.core.runtime import DEFAULT_ROUTER_MAX_TOKENS as ROUTER_MAX_TOKENS
 

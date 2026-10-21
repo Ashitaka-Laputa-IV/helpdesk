@@ -34,7 +34,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from taste_rag.core.bm25 import build_index
 from taste_rag.core.corpus import load_chunks
 from taste_rag.core.vector_store import COLLECTION, INDEX_DIR
-from taste_rag.rag.agent import build_agent
+from taste_rag.rag.agentic import build_agent
 from taste_rag.core.runtime import DEFAULT_ROUTER_MAX_TOKENS as ROUTER_MAX_TOKENS, silence_serializer_warning
 from taste_rag.rag.router import BM25_K_FUSION, SEMANTIC_K, build_graph
 

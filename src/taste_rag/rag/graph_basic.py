@@ -4,7 +4,7 @@
 索引与开库逻辑在 vector_store.py，检索原语在 retrieval.py。
 
 用法:
-    uv run python -m taste_rag.rag.basic
+    uv run python -m taste_rag.rag.graph_basic
 """
 
 from collections.abc import Iterator

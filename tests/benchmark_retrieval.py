@@ -35,7 +35,7 @@ from langchain_reranker.rerankers import init_reranker
 from taste_rag.core.bm25 import build_index, search
 from taste_rag.core.corpus import DOCS_DIR, load_chunks
 from taste_rag.core.vector_store import COLLECTION, INDEX_DIR
-from taste_rag.rag.agent import BM25_K, TOP_K
+from taste_rag.rag.agentic import BM25_K, TOP_K
 from taste_rag.rag.router import SEMANTIC_K
 
 SEED = 42
@@ -168,7 +168,7 @@ def main() -> None:
             stats["vector"]["time"].append((time.perf_counter() - started) * 1000)
             vector_sources = [doc.metadata["source"] for doc in vector_docs]
 
-            # 去重合并（与 rag_agent / rag_router 的候选池口径一致）
+            # 去重合并（与 rag.agentic / rag.router 的候选池口径一致）
             candidates, seen = [], set()
             for _, source, text in hits:
                 key = (source, text)
