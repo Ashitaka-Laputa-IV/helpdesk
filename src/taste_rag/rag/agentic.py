@@ -1,18 +1,28 @@
 """Agentic RAG：检索交给 create_agent 决定，而不是固定编排。
 
-和 rag_router.py 的区别：
-  - rag_router：router 节点先判「要不要检索」，再走固定的 召回 -> 合并 -> 重排 -> 生成。
+和 rag/router.py 的区别：
+  - rag/router：router 节点先判「要不要检索」，再走固定的 召回 -> 合并 -> 重排 -> 生成。
   - agentic：只提供一个 search_knowledge_base 工具，何时检索、检索几次、要不要再查，
     全部由模型自己决定。
 
 检索链路与固定编排保持一致：bm25(10) + 语义(15) 去重 -> 重排取前 5。
-只提供构建函数，对比测试见 tests/compare_rag.py。
+
+build_agent 供对比测试使用（tests/compare_rag.py，默认内存历史）；
+main() 是命令行入口，历史落盘到 .agentic_rag.db。
+
+用法:
+    uv run python -m taste_rag.rag.agentic
 """
 
+from pathlib import Path
+
+from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 
+from taste_rag.core import runtime
 from taste_rag.core.retrieval import (
     bm25_candidates,
     dedupe,
@@ -20,12 +30,15 @@ from taste_rag.core.retrieval import (
     rerank,
     sem_candidates,
 )
+from taste_rag.core.session import thread_config
 
+DB_PATH = Path(__file__).resolve().parents[3] / ".agentic_rag.db"
 BM25_K = 10
+SEMANTIC_K = 15  # 与 rag/router.py 保持一致
 TOP_K = 5
 
 # Agent 版没有固定的 router 节点，靠这段提示词约束「什么时候查、查到什么程度、查不到怎么说」
-SYSTEM_PROMPT = """你是 LangChain / LangGraph 的技术客服，回答必须依据文档检索结果。
+SYSTEM_PROMPT = """你是一名技术客服，回答必须依据文档检索结果。
 
 【什么时候调用工具 search_knowledge_base】
 - 问题涉及 LangChain、LangGraph 的概念、API、类名、参数、配置方式时，先调用它，不要凭记忆作答。
@@ -65,12 +78,42 @@ def build_search_tool(bm25, chunks, retriever, reranker):
     return search_knowledge_base
 
 
-def build_agent(llm, bm25, chunks, retriever, reranker):
-    """构建 agentic RAG：工具自己调，流程不写死。"""
+def build_agent(llm, bm25, chunks, retriever, reranker, checkpointer=None):
+    """构建 agentic RAG：工具自己调，流程不写死。
+
+    checkpointer 为 None 时用内存历史（测试用）；main() 传 SqliteSaver 落盘。
+    """
     tools = [build_search_tool(bm25, chunks, retriever, reranker)]
     return create_agent(
         llm,
         tools=tools,
         system_prompt=SYSTEM_PROMPT,
-        checkpointer=InMemorySaver(),
+        checkpointer=checkpointer if checkpointer is not None else InMemorySaver(),
     )
+
+
+def main() -> None:
+    runtime.silence_warnings()
+    load_dotenv()
+
+    stack = runtime.build_retrieval_stack(SEMANTIC_K, with_reranker=True)
+    config = thread_config()
+
+    # 历史与工具调用轨迹一起落盘，进程重启后还能接着问
+    with SqliteSaver.from_conn_string(str(DB_PATH)) as checkpointer:
+        agent = build_agent(
+            runtime.load_model(),
+            stack.bm25,
+            stack.chunks,
+            stack.retriever,
+            stack.reranker,
+            checkpointer,
+        )
+        runtime.run_cli(
+            # create_agent 内部的模型节点叫 model
+            lambda question: runtime.stream_answer(agent, config, question, node="model")
+        )
+
+
+if __name__ == "__main__":
+    main()
