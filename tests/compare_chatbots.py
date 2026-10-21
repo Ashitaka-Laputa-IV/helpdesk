@@ -7,6 +7,7 @@
     uv run python tests/compare_chatbots.py
 """
 
+import argparse
 import os
 import time
 
@@ -17,6 +18,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from taste_rag.chat.agent_chat import SYSTEM_PROMPT, build_agent
 from taste_rag.chat.langgraph_chat import build_graph
+from taste_rag.core import runtime
 
 # 8 轮语料：自我介绍 -> 稳定事实 -> 工具 -> 反复回忆 -> 归纳
 CORPUS = [
@@ -43,12 +45,13 @@ CHECKS = [
 ]
 
 
-def run(name: str, graph, thread_id: str) -> list[dict]:
-    """串行跑完整套语料，返回每轮记录。"""
+def run(name: str, graph, thread_id: str, limit: int = 0) -> list[dict]:
+    """串行跑完整套语料（limit>0 时只跑前 N 轮），返回每轮记录。"""
     config = {"configurable": {"thread_id": thread_id}}
+    items = CORPUS[:limit] if limit else CORPUS
     rows = []
     seen = 0  # 上轮结束时的消息条数，用来只统计本轮新增的工具调用
-    for index, question in enumerate(CORPUS):
+    for index, question in enumerate(items):
         keywords, expected_tool = CHECKS[index]
         started = time.perf_counter()
         result = graph.invoke({"messages": [HumanMessage(content=question)]}, config)
@@ -125,12 +128,19 @@ def compare(left: list[dict], right: list[dict]) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="两个多轮 chatbot 的串行对比")
+    parser.add_argument("--limit", type=int, default=0, help="只跑前 N 轮，0 表示全部")
+    args = parser.parse_args()
+
+    runtime.silence_warnings()
     load_dotenv()
     model = init_chat_model(os.environ["MODEL"])
 
     # 串行：A 跑完再跑 B，两个实现各自使用独立的 thread_id
-    rows_a = run("A", build_agent(model), "cmp-a")
-    rows_b = run("B", build_graph(model, InMemorySaver(), SYSTEM_PROMPT), "cmp-b")
+    rows_a = run("A", build_agent(model), "cmp-a", args.limit)
+    rows_b = run(
+        "B", build_graph(model, InMemorySaver(), SYSTEM_PROMPT), "cmp-b", args.limit
+    )
 
     report("A. 纯 create_agent", rows_a)
     report("B. LangGraph 手工编排", rows_b)

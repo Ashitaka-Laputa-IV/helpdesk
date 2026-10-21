@@ -7,6 +7,7 @@
     uv run python tests/compare_rag.py
 """
 
+import argparse
 import io
 import os
 import time
@@ -25,7 +26,7 @@ from taste_rag.core.corpus import load_chunks
 from taste_rag.core.vector_store import COLLECTION, INDEX_DIR
 from taste_rag.rag.agentic import build_agent
 from taste_rag.rag.workflow import SEMANTIC_K, build_graph
-from taste_rag.core.runtime import DEFAULT_ROUTER_MAX_TOKENS as ROUTER_MAX_TOKENS
+from taste_rag.core import runtime
 
 # (问题, 是否应该检索, 答案应包含的关键词)
 # 语料是英文文档，查询也必须用英文，否则测到的是语种不匹配而不是检索能力
@@ -64,12 +65,13 @@ def invoke_streaming(graph, payload, config):
     return ttft, time.perf_counter() - started, final
 
 
-def run(name: str, graph, is_agent: bool, thread_id: str) -> list[dict]:
-    """串行跑完整套语料，返回每轮记录。"""
+def run(name: str, graph, is_agent: bool, thread_id: str, limit: int = 0) -> list[dict]:
+    """串行跑完整套语料（limit>0 时只跑前 N 轮），返回每轮记录。"""
     config = {"configurable": {"thread_id": thread_id}}
+    items = CORPUS[:limit] if limit else CORPUS
     rows = []
     seen = 0  # 上轮结束时的消息条数，用来只看本轮新增内容
-    for index, (question, expect_search, keywords) in enumerate(CORPUS):
+    for index, (question, expect_search, keywords) in enumerate(items):
         # rag.workflow 的节点会打印决策日志，这里屏蔽掉以免干扰报告
         with redirect_stdout(io.StringIO()):
             ttft, cost, result = invoke_streaming(
@@ -170,6 +172,11 @@ def compare(left: list[dict], right: list[dict]) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="固定编排 vs Agentic 的串行对比")
+    parser.add_argument("--limit", type=int, default=0, help="只跑前 N 轮，0 表示全部")
+    args = parser.parse_args()
+
+    runtime.silence_warnings()
     load_dotenv()
 
     chunks = load_chunks()
@@ -196,7 +203,7 @@ def main() -> None:
         base_url=os.environ["ROUTER_BASE_URL"],
         api_key=os.environ["OPENAI_API_KEY"],
         temperature=0,
-        max_tokens=ROUTER_MAX_TOKENS,
+        max_tokens=runtime.DEFAULT_ROUTER_MAX_TOKENS,
     )
 
     # 串行：A 跑完再跑 B；各自独立的 thread 与内存 checkpointer，互不污染
@@ -210,10 +217,10 @@ def main() -> None:
         "llm",
         reranker=reranker,
     )
-    rows_a = run("A", graph_a, False, "rag-a")
+    rows_a = run("A", graph_a, False, "rag-a", args.limit)
 
     graph_b = build_agent(model, bm25, chunks, retriever, reranker)
-    rows_b = run("B", graph_b, True, "rag-b")
+    rows_b = run("B", graph_b, True, "rag-b", args.limit)
 
     report("A. 固定编排（router -> 并行召回 -> 重排 -> 生成）", rows_a)
     report("B. Agentic（create_agent + 检索工具）", rows_b)
