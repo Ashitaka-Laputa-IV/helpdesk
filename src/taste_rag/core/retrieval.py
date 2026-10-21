@@ -37,7 +37,7 @@ def dedupe(groups) -> list[dict]:
     return merged
 
 
-def rerank_candidates(reranker, candidates, query: str, top_n: int) -> list[dict]:
+def rerank(reranker, candidates, query: str, top_n: int) -> list[dict]:
     """用 cross-encoder 按原始问题重新打分，取前 top_n。"""
     if not candidates:
         return []

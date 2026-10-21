@@ -40,7 +40,7 @@ from taste_rag.core.retrieval import (
     bm25_candidates,
     dedupe,
     format_context,
-    rerank_candidates,
+    rerank,
     rrf_fuse,
     sem_candidates,
 )
@@ -96,7 +96,7 @@ def build_graph(
         if ranking == "none":
             fused = dedupe(groups)[:top_n]
         elif ranking == "rerank":
-            fused = rerank_candidates(reranker, dedupe(groups), question, top_n)
+            fused = rerank(reranker, dedupe(groups), question, top_n)
         else:
             fused = rrf_fuse(groups, top_n, rrf_k)
         return {"context": format_context(fused)}

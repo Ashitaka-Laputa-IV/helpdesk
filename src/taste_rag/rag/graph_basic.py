@@ -15,7 +15,7 @@ from langchain.messages import HumanMessage, SystemMessage
 
 from taste_rag.core import runtime
 from taste_rag.rag.common import PROMPT_WITH_DOCS
-from taste_rag.core.retrieval import format_context, rerank_candidates, sem_candidates
+from taste_rag.core.retrieval import format_context, rerank, sem_candidates
 from taste_rag.core.vector_store import INDEX_DIR, ensure_indexed, open_store
 
 RECALL_K = 10  # 向量召回条数（重排前先放宽）
@@ -41,7 +41,7 @@ def build_rag(
 
     def answer(question: str) -> Iterator[str]:
         """检索 + 重排后，逐 token 产出回答。"""
-        top = rerank_candidates(
+        top = rerank(
             reranker, sem_candidates(retriever, question), question, TOP_K
         )
         messages = [

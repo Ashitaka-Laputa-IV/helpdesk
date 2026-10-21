@@ -20,7 +20,7 @@ from langgraph.graph import END, START, StateGraph
 from taste_rag.core import runtime
 from taste_rag.core.bm25 import search
 from taste_rag.rag.common import RagState, make_answer_node
-from taste_rag.core.retrieval import format_context, rerank_candidates
+from taste_rag.core.retrieval import format_context, rerank
 
 DB_PATH = Path(__file__).resolve().parents[3] / ".bm25_chat.db"
 THREAD_ID = "bm25-chat-test"
@@ -72,7 +72,7 @@ def build_graph(model, bm25, chunks, reranker, checkpointer=None):
             )
         ]
         # 2) 用重排模型按“原始问题”排序（重排是多语言的，中文问题可直接给英文片段打分）
-        top = rerank_candidates(
+        top = rerank(
             reranker, candidates, state["messages"][-1].text, TOP_K
         )
         return {"context": format_context(top)}

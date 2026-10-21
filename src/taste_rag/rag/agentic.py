@@ -17,7 +17,7 @@ from taste_rag.core.retrieval import (
     bm25_candidates,
     dedupe,
     format_context,
-    rerank_candidates,
+    rerank,
     sem_candidates,
 )
 
@@ -57,7 +57,7 @@ def build_search_tool(bm25, chunks, retriever, reranker):
         )
 
         # 2) 重排取前 TOP_K
-        ranked = rerank_candidates(reranker, candidates, query, TOP_K)
+        ranked = rerank(reranker, candidates, query, TOP_K)
         if not ranked:
             return "没有检索到相关内容。"
         return format_context(ranked)
