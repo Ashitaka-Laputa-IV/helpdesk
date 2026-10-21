@@ -30,7 +30,7 @@ from langchain_reranker.rerankers import init_reranker
 from taste_rag.core.bm25 import build_index, search
 from taste_rag.core.corpus import load_chunks
 from taste_rag.core.vector_store import COLLECTION, INDEX_DIR
-from taste_rag.rag.router import BM25_K_FUSION, RRF_K, SEMANTIC_K
+from taste_rag.rag.workflow import BM25_K_FUSION, RRF_K, SEMANTIC_K
 
 EVAL_PATH = Path(__file__).resolve().parents[1] / "data" / "eval" / "queries.json"
 TOP_NS = (5, 8, 10)

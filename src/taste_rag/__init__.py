@@ -7,7 +7,7 @@
     api/    FastAPI 服务与命令行客户端
 
 这里只导出跨模块都会用到的一组符号，方便 `from taste_rag import thread_config`；
-具体实现按子包导入，例如 `from taste_rag.rag.router import build_graph`。
+具体实现按子包导入，例如 `from taste_rag.rag.workflow import build_graph`。
 """
 
 from taste_rag.chat.langgraph_chat import DB_PATH, build_graph, main

@@ -1,7 +1,7 @@
 """Agentic RAG：检索交给 create_agent 决定，而不是固定编排。
 
-和 rag/router.py 的区别：
-  - rag/router：router 节点先判「要不要检索」，再走固定的 召回 -> 合并 -> 重排 -> 生成。
+和 rag/workflow.py 的区别：
+  - rag/workflow：router 节点先判「要不要检索」，再走固定的 召回 -> 合并 -> 重排 -> 生成。
   - agentic：只提供一个 search_knowledge_base 工具，何时检索、检索几次、要不要再查，
     全部由模型自己决定。
 
@@ -38,7 +38,7 @@ from taste_rag.core.summarize import KEEP_MESSAGES, TRIGGER_TOKENS
 
 DB_PATH = Path(__file__).resolve().parents[3] / ".agentic_rag.db"
 BM25_K = 20
-SEMANTIC_K = 15  # 与 rag/router.py 保持一致
+SEMANTIC_K = 15  # 与 rag/workflow.py 保持一致
 TOP_K = 10
 
 # Agent 版没有固定的 router 节点，靠这段提示词约束「什么时候查、查到什么程度、查不到怎么说」

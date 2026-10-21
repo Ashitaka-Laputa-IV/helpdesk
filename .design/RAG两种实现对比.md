@@ -6,7 +6,7 @@
 
 | | 流程控制 | 构建函数 |
 |---|---|---|
-| **A** | 固定编排，router 节点决定是否检索 | `rag_router.build_graph(...)` |
+| **A** | 固定编排，router 节点决定是否检索 | `rag.workflow.build_graph(...)` |
 | **B** | `create_agent` + 检索工具，模型自主决定 | `rag.agentic.build_agent(...)` |
 
 两者的检索链路完全一致：**bm25(10) + 语义(15) 去重 → rerank 取前 5**。
@@ -14,7 +14,7 @@
 
 ## 实现差异
 
-### A. 固定编排（`src/taste_rag/rag/router.py`，默认 `ranking="rerank"`）
+### A. 固定编排（`src/taste_rag/rag/workflow.py`，默认 `ranking="rerank"`）
 
 ```mermaid
 graph TD

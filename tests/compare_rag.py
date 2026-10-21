@@ -1,4 +1,4 @@
-"""串行对比两个 RAG 实现：固定编排（rag.router）vs Agentic（rag.agentic）。
+"""串行对比两个 RAG 实现：固定编排（rag.workflow）vs Agentic（rag.agentic）。
 
 同一模型、同一套语料；A 先跑完全部轮次，B 再跑一遍（串行执行，不并行）。
 每轮记录：耗时、是否触发检索、答案、关键词校验。
@@ -24,7 +24,7 @@ from taste_rag.core.bm25 import build_index
 from taste_rag.core.corpus import load_chunks
 from taste_rag.core.vector_store import COLLECTION, INDEX_DIR
 from taste_rag.rag.agentic import build_agent
-from taste_rag.rag.router import SEMANTIC_K, build_graph
+from taste_rag.rag.workflow import SEMANTIC_K, build_graph
 from taste_rag.core.runtime import DEFAULT_ROUTER_MAX_TOKENS as ROUTER_MAX_TOKENS
 
 # (问题, 是否应该检索, 答案应包含的关键词)
@@ -70,7 +70,7 @@ def run(name: str, graph, is_agent: bool, thread_id: str) -> list[dict]:
     rows = []
     seen = 0  # 上轮结束时的消息条数，用来只看本轮新增内容
     for index, (question, expect_search, keywords) in enumerate(CORPUS):
-        # rag_router 的节点会打印决策日志，这里屏蔽掉以免干扰报告
+        # rag.workflow 的节点会打印决策日志，这里屏蔽掉以免干扰报告
         with redirect_stdout(io.StringIO()):
             ttft, cost, result = invoke_streaming(
                 graph, {"messages": [HumanMessage(content=question)]}, config

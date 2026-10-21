@@ -2,7 +2,7 @@
 
 ## 1. 目的
 
-新版 `rag_router.py`（ranking="rrf"）用 RRF 替代 reranker，但初版参数是照搬重排版的
+新版 `rag.workflow.py`（ranking="rrf"）用 RRF 替代 reranker，但初版参数是照搬重排版的
 （`bm25_k=10 / sem_k=15 / rrf_k=60 / top_n=5`）。两条链路的代价结构不同，
 参数不应相同。本报告扫描参数空间，给出各自的最优配置。
 
@@ -91,11 +91,11 @@ rerank 耗时第二遍为 816ms / 1055ms（首轮 788ms / 1007ms），波动约 
 
 | 文件 | 参数 | 原值 | 新值 |
 |---|---|---|---|
-| `rag_router.py`（ranking="rrf"） | `BM25_K_FUSION` | 10 | **25** |
-| `rag_router.py` | `SEMANTIC_K` | 复用重排档 | **15（两者共用）** |
-| `rag_router.py`（ranking="rrf"） | `RRF_K` | 60 | **20** |
-| `rag_router.py`（ranking="rrf"） | `TOP_N` | 5 | **8** |
-| `rag_router.py`（ranking="rerank"） | `TOP_N` | 5 | **8** |
+| `rag.workflow.py`（ranking="rrf"） | `BM25_K_FUSION` | 10 | **25** |
+| `rag.workflow.py` | `SEMANTIC_K` | 复用重排档 | **15（两者共用）** |
+| `rag.workflow.py`（ranking="rrf"） | `RRF_K` | 60 | **20** |
+| `rag.workflow.py`（ranking="rrf"） | `TOP_N` | 5 | **8** |
+| `rag.workflow.py`（ranking="rerank"） | `TOP_N` | 5 | **8** |
 
 `SEMANTIC_K` 定为 15（扫描显示加深到 25 会拉低 MRR）。
 

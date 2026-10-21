@@ -16,7 +16,7 @@ Router 支持两种模式（ROUTER_MODE）：
   - always：一律检索，不做判断（兜底或对比用）
 
 用法:
-    uv run python -m taste_rag.rag.router
+    uv run python -m taste_rag.rag.workflow
 """
 
 import os
