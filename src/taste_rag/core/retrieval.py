@@ -4,8 +4,6 @@
 召回与格式化的细节都收敛到这里。
 """
 
-from concurrent.futures import ThreadPoolExecutor
-
 from langchain_core.documents import Document
 
 from taste_rag.core.bm25 import search
@@ -37,16 +35,6 @@ def dedupe(groups) -> list[dict]:
                 seen.add(key)
                 merged.append(doc)
     return merged
-
-
-def recall_both(
-    bm25, chunks, retriever, query: str, bm25_k: int
-) -> tuple[list[dict], list[dict]]:
-    """bm25 与向量并发召回：前者本地计算，后者走 HTTP。"""
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        bm25_future = pool.submit(bm25_candidates, bm25, chunks, query, bm25_k)
-        vector_future = pool.submit(vector_candidates, retriever, query)
-        return bm25_future.result(), vector_future.result()
 
 
 def rerank_candidates(reranker, candidates, query: str, top_n: int) -> list[dict]:

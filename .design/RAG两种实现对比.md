@@ -57,17 +57,16 @@ graph TD
 - 用中文简洁回答，必要时给出代码片段，并标注来源文件名。
 ```
 
-工具本身（bm25 与向量召回并发执行，与 A 的图上 fan-out 等价）：
+工具本身（两路召回后去重、重排）：
 
 ```python
 @tool
 def search_knowledge_base(query: str) -> str:
     """在 LangChain / LangGraph 官方文档库中检索，返回最相关的几段原文。"""
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        bm25_future = pool.submit(search, bm25, chunks, query, BM25_K)
-        vector_future = pool.submit(retriever.invoke, query)
-        bm25_hits = bm25_future.result()
-        vector_docs = vector_future.result()
+    candidates = dedupe([
+        bm25_candidates(bm25, chunks, query, BM25_K),
+        vector_candidates(retriever, query),
+    ])
     # 去重 -> rerank 取前 5
 ```
 
@@ -214,7 +213,8 @@ uv run python tests/benchmark_retrieval.py --eval-set data/eval/queries.json --t
 4. **可控性与成本**：
    - A 多一次固定 router 调用（`max_tokens=128`，约 2s），流程确定、易调试、行为可预测；
    - B 的决策调用没有 token 上限，可能先写一段再调工具，耗时与行为都不固定。
-5. **rerank 是耗时大头，但收益需重新评估**：单次检索 566ms 里约 99% 是 rerank，并行召回只省 0.6ms。
+5. **rerank 是耗时大头，但收益需重新评估**：单次检索 566ms 里约 99% 是 rerank；
+   曾把两路召回改成并发，实测只省 0.6ms，收益可忽略，因此改回顺序调用。
    而英文改写档显示，top-5 下 rerank 相对免费 RRF 的净收益是**负的**（76.7% vs 83.3%）；
    若要保留 rerank，应配合「按文档去重 + top-k=10」（93.3%）。
    建议下一步做端到端答案质量对比（RRF vs rerank）再定去留。

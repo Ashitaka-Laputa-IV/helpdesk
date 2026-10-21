@@ -13,7 +13,13 @@ from langchain.agents import create_agent
 from langchain.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 
-from taste_rag.core.retrieval import dedupe, format_context, recall_both, rerank_candidates
+from taste_rag.core.retrieval import (
+    bm25_candidates,
+    dedupe,
+    format_context,
+    rerank_candidates,
+    vector_candidates,
+)
 
 BM25_K = 10
 TOP_K = 5
@@ -42,9 +48,13 @@ def build_search_tool(bm25, chunks, retriever, reranker):
         Args:
             query: 检索关键词，写清技术名词即可，不要写成完整长句。
         """
-        # 1) 并行召回 -> 按 (来源, 原文) 去重
-        bm25_docs, vector_docs = recall_both(bm25, chunks, retriever, query, BM25_K)
-        candidates = dedupe([bm25_docs, vector_docs])
+        # 1) 两路召回 -> 按 (来源, 原文) 去重
+        candidates = dedupe(
+            [
+                bm25_candidates(bm25, chunks, query, BM25_K),
+                vector_candidates(retriever, query),
+            ]
+        )
 
         # 2) 重排取前 TOP_K
         ranked = rerank_candidates(reranker, candidates, query, TOP_K)
