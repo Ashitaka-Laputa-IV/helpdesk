@@ -5,7 +5,7 @@
 
 from pathlib import Path
 
-DOCS_DIR = Path(__file__).resolve().parents[2] / "data" / "langchain-docs"
+DOCS_DIR = Path(__file__).resolve().parents[3] / "data" / "langchain-docs"
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 

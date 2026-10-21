@@ -3,57 +3,25 @@
 图结构：START -> chatbot -> (tools -> chatbot)* -> END
 chatbot 节点调用模型；当模型请求调用工具时，先由 tools 节点执行，再回到 chatbot。
 对话历史通过 SqliteSaver checkpointer 持久化到 .chat.db，并按 (user_id, thread_id) 隔离。
+
+通用的东西都在 core：工具在 core.tools，会话与模型装配在 core.session / core.runtime。
 """
 
 import argparse
-import os
-import warnings
-from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
 from dotenv import load_dotenv
-from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage, SystemMessage
-from langchain.tools import tool
-from langchain_core._api import LangChainBetaWarning
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-DB_PATH = Path(__file__).resolve().parents[2] / ".chat.db"
-DEFAULT_USER = "default"
-DEFAULT_THREAD = "default"
+from taste_rag.core import runtime
+from taste_rag.core.session import DEFAULT_THREAD, DEFAULT_USER, thread_config
+from taste_rag.core.tools import TOOLS
 
-
-def thread_key(user_id: str, thread_id: str) -> str:
-    """拼出 checkpointer 的 thread_id，保证不同用户/会话互不串线。"""
-    return f"{user_id}:{thread_id}"
-
-
-def thread_config(user_id: str, thread_id: str) -> dict:
-    """构造传给图的 config。"""
-    return {"configurable": {"thread_id": thread_key(user_id, thread_id)}}
-
-
-def silence_beta_warning() -> None:
-    """v3 流式协议目前是实验性的，屏蔽其 beta 警告避免污染输出。"""
-    warnings.filterwarnings("ignore", category=LangChainBetaWarning)
-
-
-@tool
-def get_current_time() -> str:
-    """获取当前的日期与时间。"""
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-
-TOOLS = [get_current_time]
-
-
-def load_model():
-    """从环境变量初始化对话模型。"""
-    load_dotenv()
-    return init_chat_model(os.environ["MODEL"])
+DB_PATH = Path(__file__).resolve().parents[3] / ".chat.db"
 
 
 def build_graph(model, checkpointer=None, system_prompt: str | None = None):
@@ -90,8 +58,9 @@ def main() -> None:
     parser.add_argument("--thread", default=DEFAULT_THREAD, help="会话标识")
     args = parser.parse_args()
 
-    silence_beta_warning()
-    model = load_model()
+    runtime.silence_warnings()
+    load_dotenv()
+    model = runtime.load_model()
     config = thread_config(args.user, args.thread)
 
     # 历史存 .chat.db，按 (user, thread) 隔离；只传新消息，LangGraph 自动接上历史

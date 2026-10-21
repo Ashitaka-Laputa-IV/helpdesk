@@ -19,21 +19,17 @@ from langchain.messages import HumanMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 from pydantic import BaseModel
 
-from taste_rag.chat.basic import (
-    DB_PATH,
-    build_graph,
-    load_model,
-    silence_beta_warning,
-    thread_config,
-)
+from taste_rag.chat.basic import DB_PATH, build_graph
+from taste_rag.core import runtime
+from taste_rag.core.session import thread_config
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """启动时建图（checkpointer 贯穿整个服务生命周期），关闭时释放。"""
-    silence_beta_warning()
+    runtime.silence_warnings()
     with SqliteSaver.from_conn_string(str(DB_PATH)) as checkpointer:
-        app.state.graph = build_graph(load_model(), checkpointer)
+        app.state.graph = build_graph(runtime.load_model(), checkpointer)
         yield
 
 

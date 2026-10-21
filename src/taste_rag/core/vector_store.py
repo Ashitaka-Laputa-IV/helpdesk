@@ -11,7 +11,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from taste_rag.core.corpus import CHUNK_OVERLAP, CHUNK_SIZE, DOCS_DIR
 
-INDEX_DIR = Path(__file__).resolve().parents[2] / ".chroma"
+INDEX_DIR = Path(__file__).resolve().parents[3] / ".chroma"
 COLLECTION = "helpdesk"  # 已持久化的索引名，改它会读不到现有向量库
 BATCH_SIZE = 1000  # Chroma 单次写入有上限（约 5461 条），分批写入
 

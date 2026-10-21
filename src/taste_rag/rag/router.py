@@ -27,7 +27,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 
 from taste_rag.core import runtime
-from taste_rag.chat.basic import DEFAULT_THREAD, DEFAULT_USER, thread_config
+from taste_rag.core.session import DEFAULT_THREAD, DEFAULT_USER, thread_config
 from taste_rag.rag.common import (
     RouteDecision,
     RouterState,
@@ -45,7 +45,7 @@ from taste_rag.core.retrieval import (
     vector_candidates,
 )
 
-DB_PATH = Path(__file__).resolve().parents[2] / ".router_chat.db"
+DB_PATH = Path(__file__).resolve().parents[3] / ".router_chat.db"
 
 BM25_K = 10  # 重排档：候选少，重排快
 BM25_K_FUSION = 25  # 融合/无排序档：只看名次，多召回不亏

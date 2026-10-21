@@ -33,6 +33,11 @@ class RetrievalStack:
     reranker: Any | None = None
 
 
+def silence_beta_warning() -> None:
+    """v3 流式协议目前是实验性的，屏蔽其 beta 警告避免污染输出。"""
+    warnings.filterwarnings("ignore", category=LangChainBetaWarning)
+
+
 def silence_serializer_warning() -> None:
     """屏蔽结构化输出的噪声。
 
@@ -45,7 +50,7 @@ def silence_serializer_warning() -> None:
 
 def silence_warnings() -> None:
     """屏蔽 beta 流式协议告警与结构化输出的序列化告警。"""
-    warnings.filterwarnings("ignore", category=LangChainBetaWarning)
+    silence_beta_warning()
     silence_serializer_warning()
 
 

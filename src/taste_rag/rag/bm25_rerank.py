@@ -22,7 +22,7 @@ from taste_rag.core.bm25 import search
 from taste_rag.rag.common import RagState, make_answer_node
 from taste_rag.core.retrieval import format_context, rerank_candidates
 
-DB_PATH = Path(__file__).resolve().parents[2] / ".bm25_chat.db"
+DB_PATH = Path(__file__).resolve().parents[3] / ".bm25_chat.db"
 THREAD_ID = "bm25-chat-test"
 N_QUERIES = 3
 RECALL_K = 30  # 每条查询的召回条数（重排前先放宽）
